@@ -1,0 +1,127 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Input - Power Up Game</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            background-color: #222;
+            color: white;
+            font-family: Arial, sans-serif;
+        }
+        
+        #game-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+        }
+        
+        #game-canvas {
+            border: 2px solid #444;
+            background-color: #f5f5f5;
+        }
+        
+        #debug-info {
+            margin-top: 20px;
+            padding: 10px;
+            background-color: #333;
+            border-radius: 5px;
+            font-family: monospace;
+            font-size: 14px;
+            width: 600px;
+        }
+        
+        .debug-row {
+            margin: 5px 0;
+        }
+        
+        .key-pressed {
+            background-color: #060;
+            padding: 2px 5px;
+            border-radius: 3px;
+        }
+        
+        .instructions {
+            margin-bottom: 20px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <div class="instructions">
+            <h2>Debug Input Test</h2>
+            <p>Use WASD to move the blue circle. Press SPACE near a broken console (red) to repair it.</p>
+            <p>Consoles will randomly break for testing purposes.</p>
+        </div>
+        
+        <canvas id="game-canvas" width="1200" height="800"></canvas>
+        
+        <div id="debug-info">
+            <div class="debug-row">Keys Pressed: <span id="keys-pressed">None</span></div>
+            <div class="debug-row">Space Just Pressed: <span id="space-pressed">No</span></div>
+            <div class="debug-row">Player Position: <span id="player-pos">0, 0</span></div>
+            <div class="debug-row">Console States: <span id="console-states">Loading...</span></div>
+            <div class="debug-row">Last Action: <span id="last-action">None</span></div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { PowerUpGame } from './src/main.js';
+        
+        // Create game instance
+        const game = new PowerUpGame();
+        window.game = game; // For debugging
+        
+        // Debug UI elements
+        const keysPressed = document.getElementById('keys-pressed');
+        const spacePressed = document.getElementById('space-pressed');
+        const playerPos = document.getElementById('player-pos');
+        const consoleStates = document.getElementById('console-states');
+        const lastAction = document.getElementById('last-action');
+        
+        // Override the handleRepairInteraction method to add debug info
+        const originalHandleRepair = game.handleRepairInteraction.bind(game);
+        game.handleRepairInteraction = function() {
+            lastAction.textContent = `Repair attempt at ${new Date().toLocaleTimeString()}`;
+            return originalHandleRepair();
+        };
+        
+        // Debug update loop
+        setInterval(() => {
+            // Show currently pressed keys
+            const pressedKeys = [];
+            const inputSystem = game.inputSystem;
+            
+            // Check common keys
+            const keysToCheck = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'];
+            keysToCheck.forEach(key => {
+                if (inputSystem.isKeyDown(key)) {
+                    pressedKeys.push(key);
+                }
+            });
+            
+            keysPressed.textContent = pressedKeys.length > 0 ? pressedKeys.join(', ') : 'None';
+            
+            // Show space just pressed
+            spacePressed.textContent = inputSystem.isKeyJustPressed('Space') ? 'YES' : 'No';
+            
+            // Show player position
+            const playerTransform = game.player.getComponent('Transform');
+            playerPos.textContent = `${Math.round(playerTransform.x)}, ${Math.round(playerTransform.y)}`;
+            
+            // Show console states
+            const states = game.consoles.map((console, i) => {
+                const transform = console.getComponent('Transform');  
+                return `Console ${i}: ${console.state} (${Math.round(transform.x)}, ${Math.round(transform.y)})`;
+            }).join(' | ');
+            consoleStates.textContent = states;
+            
+        }, 100); // Update every 100ms
+    </script>
+</body>
+</html>

@@ -1,0 +1,70 @@
+{
+  "env": {
+    "browser": true,
+    "es2022": true,
+    "node": true
+  },
+  "extends": [
+    "eslint:recommended",
+    "plugin:jsdoc/recommended",
+    "prettier"
+  ],
+  "plugins": ["jsdoc"],
+  "parserOptions": {
+    "ecmaVersion": 2022,
+    "sourceType": "module"
+  },
+  "rules": {
+    "no-console": ["warn", { "allow": ["warn", "error", "debug"] }],
+    "no-debugger": "error",
+    "no-unused-vars": ["error", { "argsIgnorePattern": "^_" }],
+    "no-global-assign": "error",
+    "no-implicit-globals": "error",
+    "eqeqeq": "error",
+    "prefer-const": "error",
+    "no-var": "error",
+    "object-shorthand": "error",
+    "prefer-arrow-callback": "error",
+    "prefer-template": "error",
+    "jsdoc/require-description": "error",
+    "jsdoc/require-param-description": "error",
+    "jsdoc/require-returns-description": "error",
+    "jsdoc/require-jsdoc": [
+      "error",
+      {
+        "require": {
+          "FunctionDeclaration": true,
+          "MethodDefinition": true,
+          "ClassDeclaration": true,
+          "ArrowFunctionExpression": false,
+          "FunctionExpression": false
+        }
+      }
+    ],
+    "jsdoc/check-param-names": "error",
+    "jsdoc/check-types": "warn",
+    "jsdoc/valid-types": "warn",
+    "jsdoc/no-defaults": "off",
+    "jsdoc/no-undefined-types": "off",
+    "jsdoc/check-tag-names": "off"
+  },
+  "overrides": [
+    {
+      "files": ["tests/**/*.js"],
+      "rules": {
+        "jsdoc/require-jsdoc": "off",
+        "jsdoc/require-description": "off",
+        "jsdoc/require-param-description": "off",
+        "jsdoc/require-returns-description": "off"
+      }
+    }
+  ],
+  "globals": {
+    "describe": "readonly",
+    "it": "readonly",
+    "expect": "readonly",
+    "beforeEach": "readonly",
+    "afterEach": "readonly",
+    "vi": "readonly"
+  }
+}
