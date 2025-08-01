@@ -90,9 +90,9 @@ test.describe('Floating Numbers System', () => {
   });
 
   test('should fade out floating numbers over time', async ({ page }) => {
-    // Create a floating number
+    // Create a floating number with longer duration to account for game loop speed
     await page.evaluate(() => {
-      window.game.createFloatingNumber(400, 300, 'TEST', '#ffffff', 1000);
+      window.game.createFloatingNumber(400, 300, 'TEST', '#ffffff', 2000);
     });
     
     // Check initial opacity
@@ -102,15 +102,29 @@ test.describe('Floating Numbers System', () => {
     
     expect(initialOpacity).toBeCloseTo(1, 1);
     
-    // Wait and check fading
-    await page.waitForTimeout(500);
+    // Wait and check fading - wait less time relative to duration
+    await page.waitForTimeout(300);
     
-    const fadedOpacity = await page.evaluate(() => {
-      return window.game.floatingNumbers[0].getOpacity();
+    const testResult = await page.evaluate(() => {
+      const floatingNumber = window.game.floatingNumbers[0];
+      if (!floatingNumber) {
+        return { exists: false, opacity: null, lifetime: null, duration: null };
+      }
+      return { 
+        exists: true, 
+        opacity: floatingNumber.getOpacity(),
+        lifetime: floatingNumber.lifetime,
+        duration: floatingNumber.duration
+      };
     });
     
-    expect(fadedOpacity).toBeLessThan(1);
-    expect(fadedOpacity).toBeGreaterThan(0);
+    // Debug info
+    if (!testResult.exists) {
+      throw new Error('Floating number was removed from array too early');
+    }
+    
+    expect(testResult.opacity).toBeLessThan(1);
+    expect(testResult.opacity).toBeGreaterThan(0);
   });
 
   test('should remove floating numbers after duration', async ({ page }) => {
@@ -125,12 +139,8 @@ test.describe('Floating Numbers System', () => {
     
     expect(initialCount).toBe(1);
     
-    // Wait for expiration and cleanup
-    await page.waitForTimeout(800);
-    
-    await page.evaluate(() => {
-      window.game.update(16.67);
-    });
+    // Wait for expiration and allow natural cleanup via game loop
+    await page.waitForTimeout(1000); // Longer wait to ensure cleanup
     
     const finalCount = await page.evaluate(() => {
       return window.game.floatingNumbers.length;

@@ -27,6 +27,9 @@ export class ConsolePurchaseSystem {
     this.gridSize = 40;
     this.minSpacing = 120; // Minimum distance between consoles
     this.edgeMargin = 80;   // Minimum distance from canvas edges
+    
+    // Event system
+    this.eventListeners = {};
   }
 
   /**
@@ -138,19 +141,13 @@ export class ConsolePurchaseSystem {
     // Get console cost
     const cost = this.consoleTypes[this.selectedConsoleType].cost;
     
-    // Create the console
-    this.game.createConsole(x, y, this.selectedConsoleType);
-    
-    // Deduct money
-    this.game.money -= cost;
-    
-    // Create floating number for cost
-    this.game.createFloatingNumber(
-      x, 
-      y - 30, 
-      `-£${cost}`, 
-      '#ff9900'
-    );
+    // Emit purchase complete event
+    this.emit('purchaseComplete', {
+      x: x,
+      y: y,
+      type: this.selectedConsoleType,
+      cost: cost
+    });
     
     // Exit placement mode
     this.placementMode = false;
@@ -204,5 +201,48 @@ export class ConsolePurchaseSystem {
       type: this.selectedConsoleType,
       valid: this.isValidPlacement(this.previewPosition.x, this.previewPosition.y)
     };
+  }
+
+  /**
+   * Register event listener
+   * @param {string} event - Event name
+   * @param {Function} callback - Callback function
+   */
+  on(event, callback) {
+    if (!this.eventListeners[event]) {
+      this.eventListeners[event] = [];
+    }
+    this.eventListeners[event].push(callback);
+  }
+
+  /**
+   * Unregister event listener
+   * @param {string} event - Event name
+   * @param {Function} callback - Callback function to remove
+   */
+  off(event, callback) {
+    if (this.eventListeners[event]) {
+      const index = this.eventListeners[event].indexOf(callback);
+      if (index > -1) {
+        this.eventListeners[event].splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit event to all listeners
+   * @param {string} event - Event name
+   * @param {*} data - Event data
+   */
+  emit(event, data) {
+    if (this.eventListeners[event]) {
+      this.eventListeners[event].forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error(`Error in event listener for ${event}:`, error);
+        }
+      });
+    }
   }
 }

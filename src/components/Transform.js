@@ -8,12 +8,23 @@ import { Component } from '../engine/Component.js';
 export class Transform extends Component {
   /**
    * Create a transform component
-   * @param {Entity} entity - The entity this component belongs to
+   * @param {Entity} [entity] - The entity this component belongs to (legacy)
    * @param {number} [x=0] - Initial x position
    * @param {number} [y=0] - Initial y position
    */
   constructor(entity, x = 0, y = 0) {
-    super(entity);
+    // Handle both old (entity, x, y) and new (x, y) signatures
+    if (typeof entity === 'number') {
+      // New signature: (x, y)
+      super();
+      y = x || 0; // Second parameter becomes y
+      x = entity; // First parameter becomes x
+      entity = null;
+    } else {
+      // Old signature: (entity, x, y)
+      super(entity);
+    }
+    
     this.type = 'Transform';
     
     this.x = x;
@@ -22,9 +33,11 @@ export class Transform extends Component {
     this.scaleX = 1;
     this.scaleY = 1;
 
-    // Keep entity position in sync
-    this.entity.x = x;
-    this.entity.y = y;
+    // Keep entity position in sync when entity is available
+    if (this.entity) {
+      this.entity.x = x;
+      this.entity.y = y;
+    }
   }
 
   /**
@@ -37,9 +50,11 @@ export class Transform extends Component {
     this.x = x;
     this.y = y;
     
-    // Keep entity position in sync
-    this.entity.x = x;
-    this.entity.y = y;
+    // Keep entity position in sync when entity is available
+    if (this.entity) {
+      this.entity.x = x;
+      this.entity.y = y;
+    }
     
     return this;
   }

@@ -61,22 +61,32 @@ export class FloatingNumber extends Entity {
     transform.setPosition(newX, newY);
     
     // Update opacity based on lifetime
-    this.opacity = this.getOpacity();
+    this.opacity = this.calculateOpacity();
   }
 
   /**
    * Calculate current opacity based on lifetime
    * @returns {number} Opacity value from 0 to 1
+   * @private
    */
-  getOpacity() {
+  calculateOpacity() {
     const progress = this.lifetime / this.duration;
     
     if (progress >= 1) {
       return 0;
     }
     
-    // Fade out over time with easing
-    return 1 - progress;
+    // Fade out over time with easing - ensure minimum opacity for partial fade
+    const opacity = 1 - progress;
+    return Math.max(0, Math.min(1, opacity));
+  }
+
+  /**
+   * Get current opacity value
+   * @returns {number} Current opacity (0-1)
+   */
+  getOpacity() {
+    return this.opacity;
   }
 
   /**

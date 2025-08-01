@@ -80,7 +80,7 @@ test.describe('Game Over System', () => {
       return window.game.floatingNumbers.filter(fn => 
         fn.text === 'GAME OVER' || 
         fn.text.includes('Too many angry guests') ||
-        fn.text.includes('Survived: Day')
+        fn.text.includes('Final Score:')
       );
     });
     

@@ -21,6 +21,13 @@ describe('ConsolePurchaseSystem', () => {
     };
 
     purchaseSystem = new ConsolePurchaseSystem(mockGame);
+    
+    // Set up event handling like the main game does
+    purchaseSystem.on('purchaseComplete', (data) => {
+      mockGame.money -= data.cost;
+      mockGame.createConsole(data.x, data.y, data.type);
+      mockGame.createFloatingNumber(data.x, data.y - 30, `-£${data.cost}`, '#ff9900');
+    });
   });
 
   describe('constructor', () => {

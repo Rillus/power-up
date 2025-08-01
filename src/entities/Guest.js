@@ -317,4 +317,132 @@ export class Guest extends Entity {
     const transform = this.getComponent('Transform');
     return (this.state === 'leaving' || this.state === 'angry') && transform.x <= 0;
   }
+
+  /**
+   * Render the guest
+   * @param {RenderSystem} renderer - The render system
+   */
+  render(renderer) {
+    super.render(renderer);
+    
+    const transform = this.getComponent('Transform');
+    if (!transform) return;
+    
+    // Get guest appearance based on type and state
+    const colors = this.getGuestColors();
+    
+    // Draw guest body (rectangle)
+    renderer.drawRect(
+      transform.x - 8,
+      transform.y - 12,
+      16,
+      24,
+      colors.body
+    );
+    
+    // Draw guest head (circle)
+    renderer.drawCircle(
+      transform.x,
+      transform.y - 16,
+      6,
+      colors.head
+    );
+    
+    // Draw state indicator
+    if (this.state === 'angry') {
+      // Draw angry indicator (red exclamation)
+      renderer.drawText(
+        '!',
+        transform.x,
+        transform.y - 25,
+        {
+          font: '12px Arial',
+          color: '#FF0000',
+          align: 'center',
+          fontWeight: 'bold'
+        }
+      );
+    } else if (this.state === 'waiting') {
+      // Draw patience indicator
+      const patienceRatio = this.getRemainingPatience() / this.patience;
+      const indicatorColor = patienceRatio > 0.5 ? '#00FF00' : patienceRatio > 0.2 ? '#FFFF00' : '#FF0000';
+      
+      // Small patience bar above head
+      const barWidth = 12;
+      const barHeight = 2;
+      const barX = transform.x - barWidth / 2;
+      const barY = transform.y - 30;
+      
+      renderer.drawRect(barX, barY, barWidth, barHeight, '#333333');
+      renderer.drawRect(barX, barY, barWidth * patienceRatio, barHeight, indicatorColor);
+    }
+    
+    // Draw guest type indicator (small text)
+    renderer.drawText(
+      this.type[0].toUpperCase(),
+      transform.x,
+      transform.y + 15,
+      {
+        font: '8px Arial',
+        color: '#666666',
+        align: 'center'
+      }
+    );
+  }
+
+  /**
+   * Get colors for guest rendering based on type and state
+   * @returns {Object} Object with body and head colors
+   * @private
+   */
+  getGuestColors() {
+    // Base colors by guest type
+    const typeColors = {
+      'casual': { body: '#4CAF50', head: '#FFC107' },      // Green body, yellow head
+      'enthusiast': { body: '#2196F3', head: '#FF9800' },  // Blue body, orange head
+      'impatient': { body: '#FF5722', head: '#FFEB3B' },   // Red body, bright yellow head
+      'collector': { body: '#9C27B0', head: '#E91E63' }    // Purple body, pink head
+    };
+    
+    let colors = typeColors[this.type] || typeColors['casual'];
+    
+    // Modify colors based on state
+    if (this.state === 'angry') {
+      colors = { body: '#B71C1C', head: '#D32F2F' }; // Dark red when angry
+    } else if (this.state === 'using') {
+      // Slightly brighter when using console
+      colors = {
+        body: this.lightenColor(colors.body),
+        head: colors.head
+      };
+    }
+    
+    return colors;
+  }
+
+  /**
+   * Lighten a hex color
+   * @param {string} color - Hex color string
+   * @returns {string} Lightened hex color
+   * @private
+   */
+  lightenColor(color) {
+    // Simple color lightening - could be more sophisticated
+    const hex = color.replace('#', '');
+    const r = Math.min(255, parseInt(hex.substr(0, 2), 16) + 30);
+    const g = Math.min(255, parseInt(hex.substr(2, 2), 16) + 30);
+    const b = Math.min(255, parseInt(hex.substr(4, 2), 16) + 30);
+    
+    return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+  }
+
+  /**
+   * Get remaining patience as a ratio
+   * @returns {number} Patience remaining (0-1)
+   * @private
+   */
+  getRemainingPatience() {
+    const elapsed = Date.now() - this.arrivalTime;
+    return Math.max(0, (this.patience - elapsed) / this.patience);
+  }
 }

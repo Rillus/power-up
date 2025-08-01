@@ -125,11 +125,11 @@ describe('FloatingNumber', () => {
       expect(floatingNumber.getOpacity()).toBeGreaterThan(0.7);
       
       // Halfway through
-      floatingNumber.lifetime = 1000;
+      floatingNumber.update(500); // Additional 500ms to reach 1000ms total
       expect(floatingNumber.getOpacity()).toBe(0.5);
       
       // Near end
-      floatingNumber.lifetime = 1800;
+      floatingNumber.update(800); // Additional 800ms to reach 1800ms total
       expect(floatingNumber.getOpacity()).toBeLessThan(0.2);
     });
 

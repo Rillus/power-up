@@ -35,9 +35,12 @@ describe('InputSystem', () => {
   describe('constructor', () => {
     it('should initialize with provided element', () => {
       expect(inputSystem.element).toBe(mockElement);
-      expect(mockElement.addEventListener).toHaveBeenCalledTimes(2);
+      expect(mockElement.addEventListener).toHaveBeenCalledTimes(5);
       expect(mockElement.addEventListener).toHaveBeenCalledWith('keydown', expect.any(Function));
       expect(mockElement.addEventListener).toHaveBeenCalledWith('keyup', expect.any(Function));
+      expect(mockElement.addEventListener).toHaveBeenCalledWith('mousedown', expect.any(Function));
+      expect(mockElement.addEventListener).toHaveBeenCalledWith('mouseup', expect.any(Function));
+      expect(mockElement.addEventListener).toHaveBeenCalledWith('mousemove', expect.any(Function));
     });
 
     it('should use document if no element provided', () => {

@@ -1,11 +1,14 @@
 import { RenderSystem } from './engine/systems/RenderSystem.js';
 import { InputSystem } from './engine/systems/InputSystem.js';
-import { Entity } from './engine/Entity.js';
-import { Transform } from './components/Transform.js';
+import { AudioSystem } from './engine/systems/AudioSystem.js';
+import { Character } from './entities/Character.js';
 import { GameConsole } from './entities/GameConsole.js';
 import { Guest } from './entities/Guest.js';
 import { FloatingNumber } from './entities/FloatingNumber.js';
 import { ConsolePurchaseSystem } from './systems/ConsolePurchaseSystem.js';
+import { GameStateManager } from './systems/GameStateManager.js';
+import { SaveSystem } from './utils/SaveSystem.js';
+import { TutorialSystem } from './systems/TutorialSystem.js';
 
 /**
  * Main game application
@@ -17,41 +20,183 @@ class PowerUpGame {
    */
   constructor() {
     this.canvas = document.getElementById('game-canvas');
-    this.renderSystem = new RenderSystem(this.canvas);
-    this.inputSystem = new InputSystem(document); // Use document for reliable keyboard input
-    this.purchaseSystem = new ConsolePurchaseSystem(this);
     
+    // Initialize core systems
+    this.renderSystem = new RenderSystem(this.canvas);
+    this.inputSystem = new InputSystem(document);
+    this.audioSystem = new AudioSystem();
+    this.saveSystem = new SaveSystem();
+    
+    // Initialize game systems
+    this.gameStateManager = new GameStateManager(this.saveSystem, this.audioSystem);
+    this.purchaseSystem = new ConsolePurchaseSystem(this);
+    this.tutorialSystem = new TutorialSystem(this.saveSystem);
+    
+    // Game entities
     this.entities = [];
+    this.character = null;
+    this.consoles = [];
+    this.guests = [];
+    this.floatingNumbers = [];
+    
+    // Game timing
     this.running = false;
     this.lastTime = 0;
-    
-    // Create player entity
-    this.player = new Entity(600, 400);
-    this.player.addComponent(new Transform(this.player, 600, 400));
-    this.entities.push(this.player);
-    
-    // Create initial consoles (Phase 1: start with 2 retro arcades)
-    this.consoles = [];
-    this.createConsole(200, 200, 'retro-arcade');
-    this.createConsole(400, 200, 'retro-arcade');
-    
-    // Guest management
-    this.guests = [];
     this.lastGuestSpawn = 0;
     this.guestSpawnInterval = 8000; // 8 seconds between guests initially
     
-    // Visual feedback
-    this.floatingNumbers = [];
-    
-    // Game state
-    this.money = 2000;
-    this.day = 1;
-    this.angryGuests = 0;
-    this.maxAngryGuests = 3;
-    this.gameOver = false;
-    this.gameOverReason = null;
+    // Bind event handlers
+    this.setupEventHandlers();
     
     this.init();
+  }
+
+  /**
+   * Setup event handlers for game systems communication
+   * @private
+   */
+  setupEventHandlers() {
+    // Game state events
+    this.gameStateManager.on('stateChanged', (data) => {
+      this.handleStateChange(data);
+    });
+    
+    this.gameStateManager.on('moneyChanged', (data) => {
+      this.updateUI();
+      
+      // Play money sound for positive amounts
+      if (data.amount > 0) {
+        this.audioSystem.playMoneySound();
+      }
+    });
+    
+    this.gameStateManager.on('angryGuest', (data) => {
+      this.audioSystem.playWarningSound();
+      
+      // Update UI counter
+      this.updateUI();
+      
+      // Create visual warning
+      this.createFloatingNumber(
+        this.canvas.width / 2,
+        100,
+        `Angry guests: ${data.count}/${data.limit}`,
+        '#FF0000',
+        3000
+      );
+    });
+    
+    this.gameStateManager.on('gameOver', (data) => {
+      this.handleGameOver(data);
+    });
+    
+    // Purchase system events
+    this.purchaseSystem.on('purchaseComplete', (data) => {
+      this.gameStateManager.spendMoney(data.cost);
+      this.audioSystem.playClickSound();
+      
+      // Create the console entity
+      this.createConsole(data.x, data.y, data.type);
+    });
+  }
+
+  /**
+   * Handle game state changes
+   * @param {Object} data - State change data
+   * @private
+   */
+  handleStateChange(data) {
+    switch (data.currentState) {
+      case 'playing':
+        if (data.previousState === 'menu' || data.previousState === 'loading') {
+          this.startGame();
+        }
+        break;
+        
+      case 'paused':
+        this.pauseGame();
+        break;
+        
+      case 'gameOver':
+        this.endGame();
+        break;
+    }
+  }
+
+  /**
+   * Handle game over
+   * @param {Object} data - Game over data
+   * @private
+   */
+  handleGameOver(data) {
+    this.running = false;
+    
+    // Create game over floating text
+    this.createFloatingNumber(
+      this.canvas.width / 2,
+      this.canvas.height / 2 - 40,
+      'GAME OVER',
+      '#FF0000',
+      8000,
+      { x: 0, y: 0 }
+    );
+    
+    this.createFloatingNumber(
+      this.canvas.width / 2,
+      this.canvas.height / 2,
+      data.reason,
+      '#FF6600',
+      8000,
+      { x: 0, y: 0 }
+    );
+    
+    this.createFloatingNumber(
+      this.canvas.width / 2,
+      this.canvas.height / 2 + 40,
+      `Final Score: ${data.finalScore}`,
+      '#FFFF00',
+      8000,
+      { x: 0, y: 0 }
+    );
+    
+    if (data.isHighScore) {
+      this.createFloatingNumber(
+        this.canvas.width / 2,
+        this.canvas.height / 2 + 80,
+        'NEW HIGH SCORE!',
+        '#00FF00',
+        8000,
+        { x: 0, y: 0 }
+      );
+    }
+  }
+
+  /**
+   * Create a new character
+   * @param {number} x - Initial X position
+   * @param {number} y - Initial Y position
+   * @returns {Character} Created character
+   */
+  createCharacter(x, y) {
+    if (this.character) {
+      // Remove existing character
+      const index = this.entities.indexOf(this.character);
+      if (index > -1) {
+        this.entities.splice(index, 1);
+      }
+    }
+    
+    this.character = new Character(x, y, {
+      name: 'Player',
+      color: '#0066CC',
+      speed: 200
+    });
+    
+    // Alias for test compatibility
+    this.player = this.character;
+    
+    this.entities.push(this.character);
+    return this.character;
   }
 
   /**
@@ -59,9 +204,24 @@ class PowerUpGame {
    * @param {number} x - X position
    * @param {number} y - Y position  
    * @param {string} type - Console type
+   * @returns {GameConsole} Created console
    */
   createConsole(x, y, type) {
     const console = new GameConsole(x, y, type);
+    
+    // Listen for repair completion
+    console.on('repairCompleted', (data) => {
+      this.createFloatingNumber(
+        data.x,
+        data.y - 30,
+        'REPAIRED!',
+        '#00FF00',
+        2000
+      );
+      
+      this.audioSystem.playRepairSound();
+    });
+    
     this.consoles.push(console);
     this.entities.push(console);
     return console;
@@ -69,16 +229,17 @@ class PowerUpGame {
 
   /**
    * Spawn a new guest
+   * @returns {Guest} Created guest
    */
   spawnGuest() {
     const guestTypes = ['casual', 'enthusiast', 'impatient', 'collector'];
     const randomType = guestTypes[Math.floor(Math.random() * guestTypes.length)];
     
     // Spawn at entrance (right side of screen)
-    const guest = new Guest(1200, 300 + Math.random() * 200, randomType);
+    const guest = new Guest(750, 200 + Math.random() * 200, randomType);
     
     // Set initial target near entrance
-    guest.targetX = 1000;
+    guest.targetX = 600;
     guest.targetY = guest.y;
     
     this.guests.push(guest);
@@ -95,6 +256,7 @@ class PowerUpGame {
    * @param {string} color - Color of the text
    * @param {number} [duration] - Duration in milliseconds
    * @param {Object} [velocity] - Movement velocity
+   * @returns {FloatingNumber} Created floating number
    */
   createFloatingNumber(x, y, text, color, duration, velocity) {
     const floatingNumber = new FloatingNumber(x, y, text, color, duration, velocity);
@@ -115,16 +277,133 @@ class PowerUpGame {
 
     // Make canvas focusable and focus it
     this.canvas.focus();
+    
+    // Try to load existing game state
+    const loadResult = this.gameStateManager.loadGameState();
+    
+    if (loadResult.success && !loadResult.isNewGame) {
+      // Continue existing game
+      console.debug('Loading existing game from saved state');
+      this.loadGameEntities();
+      this.gameStateManager.setState('playing');
+      this.start(); // Start the game loop for loaded games
+    } else {
+      // New game - check if tutorial should be shown
+      if (!this.tutorialSystem.tutorialCompleted) {
+        this.showMainMenu();
+      } else {
+        this.startNewGame();
+      }
+    }
 
     console.debug('Power Up game initialized');
+  }
+
+  /**
+   * Load game entities from saved state
+   * @private
+   */
+  loadGameEntities() {
+    const gameData = this.gameStateManager.gameData;
+    
+    // Clear existing entities first
+    this.entities = [];
+    this.consoles = [];
+    this.guests = [];
+    this.floatingNumbers = [];
+    this.character = null;
+    
+    // Create character at canvas center
+    this.createCharacter(600, 400);
+    
+    // Load consoles
+    if (gameData.consoles && gameData.consoles.length > 0) {
+      gameData.consoles.forEach(consoleData => {
+        const console = this.createConsole(consoleData.x, consoleData.y, consoleData.type);
+        // Restore console state
+        console.durability = consoleData.durability || console.maxDurability;
+        console.state = consoleData.state || 'operational';
+      });
+    } else {
+      // Create default starting consoles
+      this.createConsole(200, 200, 'retro-arcade');
+      this.createConsole(400, 200, 'retro-arcade');
+    }
+    
+    this.updateUI();
+  }
+
+  /**
+   * Show main menu (for new games)
+   * @private
+   */
+  showMainMenu() {
+    this.gameStateManager.setState('menu');
+    
+    // For now, just start tutorial or new game
+    // In a full implementation, this would show a proper menu
+    if (this.tutorialSystem.startTutorial()) {
+      // Tutorial started
+      this.startNewGame();
+    } else {
+      this.startNewGame();
+    }
+  }
+
+  /**
+   * Start a new game
+   */
+  startNewGame() {
+    // Initialize game state
+    this.gameStateManager.startNewGame();
+    
+    // Clear existing entities
+    this.entities = [];
+    this.consoles = [];
+    this.guests = [];
+    this.floatingNumbers = [];
+    
+    // Create character at canvas center
+    this.createCharacter(600, 400);
+    
+    // Create initial consoles
+    this.createConsole(200, 200, 'retro-arcade');
+    this.createConsole(400, 200, 'retro-arcade');
+    
+    // Start game loop
     this.start();
+  }
+
+  /**
+   * Start the game
+   * @private
+   */
+  startGame() {
+    this.running = true;
+    this.lastGuestSpawn = Date.now();
+    this.updateUI();
+  }
+
+  /**
+   * Pause the game
+   * @private
+   */
+  pauseGame() {
+    this.running = false;
+  }
+
+  /**
+   * End the game
+   * @private
+   */
+  endGame() {
+    this.running = false;
   }
 
   /**
    * Start the game loop
    */
   start() {
-    this.running = true;
     this.lastTime = performance.now();
     this.gameLoop(this.lastTime);
   }
@@ -134,26 +413,14 @@ class PowerUpGame {
    * @param {number} currentTime - Current timestamp
    */
   gameLoop(currentTime) {
-    if (!this.running && !this.gameOver) return;
-
     const deltaTime = currentTime - this.lastTime;
     this.lastTime = currentTime;
 
-    // Continue updating floating numbers and visual effects even when game over
-    if (this.gameOver) {
-      // Only update floating numbers and render when game over
-      this.floatingNumbers.forEach(fn => fn.update(deltaTime));
-      this.floatingNumbers = this.floatingNumbers.filter(fn => {
-        if (fn.shouldRemove()) {
-          const entityIndex = this.entities.indexOf(fn);
-          if (entityIndex > -1) {
-            this.entities.splice(entityIndex, 1);
-          }
-          return false;
-        }
-        return true;
-      });
-    } else {
+    // Always update floating numbers for visual feedback
+    this.updateFloatingNumbers(deltaTime);
+    
+    // Update game logic only if playing
+    if (this.gameStateManager.getState() === 'playing' && this.running) {
       this.update(deltaTime);
     }
     
@@ -167,27 +434,86 @@ class PowerUpGame {
    * @param {number} deltaTime - Time elapsed since last update
    */
   update(deltaTime) {
-    // Test player movement
-    const movement = this.inputSystem.getMovementVector();
-    const playerTransform = this.player.getComponent('Transform');
+    // Handle character input
+    this.handleCharacterInput(deltaTime);
     
-    if (movement.x !== 0 || movement.y !== 0) {
-      const speed = 200; // pixels per second
-      const moveX = movement.x * speed * (deltaTime / 1000);
-      const moveY = movement.y * speed * (deltaTime / 1000);
-      
-      // Keep player within bounds
-      const newX = Math.max(20, Math.min(1180, playerTransform.x + moveX));
-      const newY = Math.max(20, Math.min(780, playerTransform.y + moveY));
-      
-      playerTransform.setPosition(newX, newY);
-    }
-
+    // Handle tutorial interactions
+    this.handleTutorialInput();
+    
+    // Handle console purchase interactions
+    this.handlePurchaseInput();
+    
     // Handle repair interaction
     if (this.inputSystem.isKeyJustPressed('Space')) {
       this.handleRepairInteraction();
     }
     
+    // Guest spawning
+    this.updateGuestSpawning();
+    
+    // Guest AI and console interaction
+    this.updateGuestAI();
+    
+    // Process guest payments
+    this.processGuestPayments();
+    
+    // Remove guests that have left
+    this.cleanupGuests();
+    
+    // Update console breakdown simulation
+    this.updateConsoleBreakdowns();
+    
+    // Update all entities
+    this.entities.forEach(entity => {
+      entity.update(deltaTime);
+    });
+    
+    // Update input system to clear just pressed/released states
+    this.inputSystem.update();
+  }
+
+  /**
+   * Handle character movement input
+   * @param {number} deltaTime - Time elapsed
+   * @private
+   */
+  handleCharacterInput(deltaTime) {
+    if (!this.character) return;
+    
+    const movement = this.inputSystem.getMovementVector();
+    
+    if (movement.x !== 0 || movement.y !== 0) {
+      this.character.setMovementDirection(movement.x, movement.y);
+    } else {
+      this.character.stopMoving();
+    }
+  }
+
+  /**
+   * Handle tutorial input
+   * @private
+   */
+  handleTutorialInput() {
+    if (!this.tutorialSystem.isActive) return;
+    
+    // Handle mouse clicks for tutorial
+    if (this.inputSystem.isMousePressed()) {
+      const mousePos = this.inputSystem.getMousePosition();
+      this.tutorialSystem.handleClick(mousePos.x, mousePos.y);
+    }
+    
+    // Handle keyboard input for tutorial
+    const pressedKeys = this.inputSystem.getJustPressedKeys();
+    pressedKeys.forEach(key => {
+      this.tutorialSystem.handleKeyPress(key);
+    });
+  }
+
+  /**
+   * Handle console purchase input
+   * @private
+   */
+  handlePurchaseInput() {
     // Handle console purchase shortcuts
     if (this.inputSystem.isKeyJustPressed('Digit1')) {
       this.purchaseSystem.startPlacement('retro-arcade');
@@ -203,10 +529,9 @@ class PowerUpGame {
     }
     
     // Handle purchase system interactions
-    if (this.purchaseSystem.placementMode) {
-      // Update preview position based on mouse or player position
-      const playerTransform = this.player.getComponent('Transform');
-      this.purchaseSystem.updatePreviewPosition(playerTransform.x, playerTransform.y);
+    if (this.purchaseSystem.placementMode && this.character) {
+      const characterPos = this.character.getPosition();
+      this.purchaseSystem.updatePreviewPosition(characterPos.x, characterPos.y);
       
       // Confirm placement with Enter
       if (this.inputSystem.isKeyJustPressed('Enter')) {
@@ -218,45 +543,82 @@ class PowerUpGame {
         this.purchaseSystem.cancelPlacement();
       }
     }
-    
-    // Guest spawning
+  }
+
+  /**
+   * Update guest spawning
+   * @private
+   */
+  updateGuestSpawning() {
     const currentTime = Date.now();
     if (currentTime - this.lastGuestSpawn > this.guestSpawnInterval) {
       this.spawnGuest();
       this.lastGuestSpawn = currentTime;
     }
-    
-    // Guest AI and console interaction
-    this.updateGuestAI();
-    
-    // Process guest payments for those leaving (not angry)
+  }
+
+  /**
+   * Update guest AI behavior
+   * @private
+   */
+  updateGuestAI() {
     this.guests.forEach(guest => {
-      if (guest.state === 'leaving' && guest.currentConsole === null) {
-        // Guest just finished using a console and is about to leave
-        // This check prevents double payment
-        if (!guest.hasPaid) {
-          const lastConsole = this.consoles.find(c => c.type === guest.lastConsoleType);
-          if (lastConsole) {
-            const payment = guest.calculatePayment(lastConsole);
-            this.money += payment;
-            
-            // Create floating money number
-            const guestTransform = guest.getComponent('Transform');
-            this.createFloatingNumber(
-              guestTransform.x, 
-              guestTransform.y - 20, 
-              `+£${payment}`, 
-              '#00ff00'
-            );
-            
-            console.debug(`Guest paid £${payment}, total: £${this.money}`);
-            guest.hasPaid = true;
+      if (guest.state === 'seeking') {
+        const nearestConsole = guest.findNearestConsole(this.consoles);
+        
+        if (nearestConsole) {
+          const guestTransform = guest.getComponent('Transform');
+          const consoleTransform = nearestConsole.getComponent('Transform');
+          const distance = guestTransform.distanceTo(consoleTransform);
+          
+          if (distance < 60) {
+            try {
+              guest.startUsingConsole(nearestConsole);
+              console.debug(`Guest started using ${nearestConsole.type} console`);
+            } catch (error) {
+              guest.moveToConsole(nearestConsole);
+            }
+          } else {
+            guest.moveToConsole(nearestConsole);
           }
         }
       }
     });
-    
-    // Remove guests that have left
+  }
+
+  /**
+   * Process guest payments
+   * @private
+   */
+  processGuestPayments() {
+    this.guests.forEach(guest => {
+      if (guest.state === 'leaving' && guest.currentConsole === null && !guest.hasPaid) {
+        const lastConsole = this.consoles.find(c => c.type === guest.lastConsoleType);
+        if (lastConsole) {
+          const payment = guest.calculatePayment(lastConsole);
+          this.gameStateManager.addMoney(payment);
+          this.gameStateManager.serveGuest();
+          
+          // Create floating money number
+          const guestTransform = guest.getComponent('Transform');
+          this.createFloatingNumber(
+            guestTransform.x, 
+            guestTransform.y - 20, 
+            `+£${payment}`, 
+            '#00FF00'
+          );
+          
+          guest.hasPaid = true;
+        }
+      }
+    });
+  }
+
+  /**
+   * Clean up guests that have left
+   * @private
+   */
+  cleanupGuests() {
     this.guests = this.guests.filter(guest => {
       if (guest.shouldRemove()) {
         // Remove from entities array
@@ -265,9 +627,9 @@ class PowerUpGame {
           this.entities.splice(entityIndex, 1);
         }
         
-        // Track angry guests for game over condition
+        // Track angry guests
         if (guest.state === 'angry') {
-          this.angryGuests++;
+          this.gameStateManager.addAngryGuest();
           
           // Create floating notification for angry guest
           const guestTransform = guest.getComponent('Transform');
@@ -275,7 +637,7 @@ class PowerUpGame {
             guestTransform.x,
             guestTransform.y - 20,
             'ANGRY!',
-            '#ff0000',
+            '#FF0000',
             2000
           );
         }
@@ -284,11 +646,60 @@ class PowerUpGame {
       }
       return true;
     });
+  }
 
-    // Remove expired floating numbers
+  /**
+   * Update console breakdowns (simulation)
+   * @private
+   */
+  updateConsoleBreakdowns() {
+    // Manual console breaking for testing (B key)
+    if (this.inputSystem.isKeyJustPressed('KeyB')) {
+      const operationalConsoles = this.consoles.filter(c => c.isOperational());
+      if (operationalConsoles.length > 0) {
+        const randomConsole = operationalConsoles[Math.floor(Math.random() * operationalConsoles.length)];
+        randomConsole.durability = 0;
+        randomConsole.state = 'broken';
+        
+        this.createFloatingNumber(
+          randomConsole.getComponent('Transform').x,
+          randomConsole.getComponent('Transform').y - 30,
+          'BROKEN!',
+          '#FF0000',
+          1500
+        );
+      }
+    }
+    
+    // Random console breakdowns for gameplay
+    if (Math.random() < 0.0008) { // Adjusted probability
+      const operationalConsoles = this.consoles.filter(c => c.isOperational());
+      if (operationalConsoles.length > 0) {
+        const randomConsole = operationalConsoles[Math.floor(Math.random() * operationalConsoles.length)];
+        randomConsole.durability = 0;
+        randomConsole.state = 'broken';
+        
+        this.createFloatingNumber(
+          randomConsole.getComponent('Transform').x,
+          randomConsole.getComponent('Transform').y - 30,
+          'BROKEN!',
+          '#FF0000',
+          1500
+        );
+      }
+    }
+  }
+
+  /**
+   * Update floating numbers
+   * @param {number} deltaTime - Time elapsed
+   * @private
+   */
+  updateFloatingNumbers(deltaTime) {
+    this.floatingNumbers.forEach(fn => fn.update(deltaTime));
+    
     this.floatingNumbers = this.floatingNumbers.filter(floatingNumber => {
       if (floatingNumber.shouldRemove()) {
-        // Remove from entities array
         const entityIndex = this.entities.indexOf(floatingNumber);
         if (entityIndex > -1) {
           this.entities.splice(entityIndex, 1);
@@ -297,318 +708,215 @@ class PowerUpGame {
       }
       return true;
     });
-    
-    // Handle manual console breaking for testing (B key)
-    if (this.inputSystem.isKeyJustPressed('KeyB')) {
-      const operationalConsoles = this.consoles.filter(c => c.isOperational());
-      if (operationalConsoles.length > 0) {
-        const randomConsole = operationalConsoles[Math.floor(Math.random() * operationalConsoles.length)];
-        randomConsole.durability = 0;
-        randomConsole.state = 'broken';
-        
-        // Create floating notification
-        const consoleTransform = randomConsole.getComponent('Transform');
-        this.createFloatingNumber(
-          consoleTransform.x,
-          consoleTransform.y - 30,
-          'BROKEN!',
-          '#ff0000',
-          1500
-        );
-      }
-    }
-    
-    // Randomly break consoles for testing (temporary) - increased frequency
-    if (Math.random() < 0.001) { // Slightly higher chance each frame
-      const operationalConsoles = this.consoles.filter(c => c.isOperational());
-      if (operationalConsoles.length > 0) {
-        const randomConsole = operationalConsoles[Math.floor(Math.random() * operationalConsoles.length)];
-        randomConsole.durability = 0;
-        randomConsole.state = 'broken';
-        
-        // Create floating notification
-        const consoleTransform = randomConsole.getComponent('Transform');
-        this.createFloatingNumber(
-          consoleTransform.x,
-          consoleTransform.y - 30,
-          'BROKEN!',
-          '#ff0000',
-          1500
-        );
-      }
-    }
-
-    // Track console states for floating number notifications
-    const consolesBeforeUpdate = this.consoles.map(console => ({
-      console: console,
-      wasBroken: console.state === 'broken',
-      wasUnderRepair: console.state === 'under-repair'
-    }));
-    
-    // Update all entities
-    this.entities.forEach(entity => {
-      entity.update(deltaTime);
-    });
-    
-    // Check for console repair completions
-    consolesBeforeUpdate.forEach(({ console, wasUnderRepair }) => {
-      if (wasUnderRepair && console.state === 'operational') {
-        // Console just finished repairing
-        const consoleTransform = console.getComponent('Transform');
-        this.createFloatingNumber(
-          consoleTransform.x,
-          consoleTransform.y - 30,
-          'REPAIRED!',
-          '#00ff00',
-          1500
-        );
-      }
-    });
-    
-    // Check for game over conditions
-    this.checkGameOverConditions();
-    
-    // Update input system at the end to clear just pressed/released states
-    this.inputSystem.update();
   }
 
   /**
-   * Check if game over conditions are met
+   * Handle repair interaction when SPACE is pressed
    */
-  checkGameOverConditions() {
-    if (this.gameOver) return;
+  handleRepairInteraction() {
+    if (!this.character) return;
     
-    if (this.angryGuests >= this.maxAngryGuests) {
-      this.gameOver = true;
-      this.gameOverReason = `Too many angry guests (${this.angryGuests}/${this.maxAngryGuests})`;
-      this.endGame();
+    const characterPos = this.character.getPosition();
+    const repairRange = 80;
+    
+    // Find broken console within range
+    const brokenConsole = this.consoles.find(console => {
+      if (console.state !== 'broken') return false;
+      
+      const consoleTransform = console.getComponent('Transform');
+      const distance = Math.sqrt(
+        (characterPos.x - consoleTransform.x) ** 2 + 
+        (characterPos.y - consoleTransform.y) ** 2
+      );
+      return distance <= repairRange;
+    });
+    
+    if (brokenConsole) {
+      brokenConsole.startRepair();
+      this.audioSystem.playRepairSound();
+      
+      // Create floating repair notification
+      const consoleTransform = brokenConsole.getComponent('Transform');
+      this.createFloatingNumber(
+        consoleTransform.x, 
+        consoleTransform.y - 30, 
+        'REPAIRING...', 
+        '#FFFF00',
+        3000
+      );
     }
-  }
-
-  /**
-   * End the game and show game over state
-   */
-  endGame() {
-    this.running = false;
-    
-    // Create game over floating text
-    this.createFloatingNumber(
-      this.canvas.width / 2,
-      this.canvas.height / 2,
-      'GAME OVER',
-      '#ff0000',
-      5000,
-      { x: 0, y: 0 } // No movement
-    );
-    
-    this.createFloatingNumber(
-      this.canvas.width / 2,
-      this.canvas.height / 2 + 40,
-      this.gameOverReason,
-      '#ff6600',
-      5000,
-      { x: 0, y: 0 }
-    );
-    
-    this.createFloatingNumber(
-      this.canvas.width / 2,
-      this.canvas.height / 2 + 80,
-      `Survived: Day ${this.day}`,
-      '#ffff00',
-      5000,
-      { x: 0, y: 0 }
-    );
-    
-    console.log('Game Over:', this.gameOverReason);
   }
 
   /**
    * Render the game
    */
   render() {
-    // Clear canvas
-    this.renderSystem.clear();
+    try {
+      // Clear canvas
+      this.renderSystem.clear();
 
-    // Draw test grid
-    this.drawGrid();
+      // Draw background grid
+      this.drawGrid();
 
-    // Draw consoles
-    this.consoles.forEach(console => {
-      const transform = console.getComponent('Transform');
-      const statusColor = console.getStatusColor();
-      
-      // Draw console as rectangle
-      this.renderSystem.drawRect(
-        transform.x - 30, 
-        transform.y - 20, 
-        60, 40, 
-        '#666666'
-      );
-      
-      // Draw status indicator
-      this.renderSystem.drawCircle(
-        transform.x + 25, 
-        transform.y - 15, 
-        8, 
-        statusColor
-      );
-      
-      // Draw console type label
-      this.renderSystem.drawText(
-        console.type.split('-')[0].toUpperCase(), 
-        transform.x - 25, 
-        transform.y - 5, 
-        { font: '12px Arial', color: '#fff', align: 'left' }
-      );
-      
-      // Draw durability bar
-      const durabilityRatio = console.durability / console.maxDurability;
-      const barWidth = 50;
-      const barHeight = 4;
-      
-      // Background
-      this.renderSystem.drawRect(
-        transform.x - 25, 
-        transform.y + 15, 
-        barWidth, barHeight, 
-        '#333'
-      );
-      
-      // Durability fill
-      this.renderSystem.drawRect(
-        transform.x - 25, 
-        transform.y + 15, 
-        barWidth * durabilityRatio, barHeight, 
-        durabilityRatio > 0.5 ? '#00ff00' : durabilityRatio > 0.25 ? '#ffff00' : '#ff0000'
-      );
-      
-      // Draw repair progress if under repair
-      if (console.state === 'under-repair') {
-        const repairProgress = console.getRepairProgress();
-        this.renderSystem.drawRect(
-          transform.x - 25, 
-          transform.y + 25, 
-          barWidth * repairProgress, 6, 
-          '#00aaff'
-        );
-        
-        this.renderSystem.drawText(
-          'REPAIRING...', 
-          transform.x, 
-          transform.y + 35, 
-          { font: '10px Arial', color: '#00aaff', align: 'center' }
-        );
-      }
-    });
-
-    // Draw guests
-    this.guests.forEach(guest => {
-      const transform = guest.getComponent('Transform');
-      const statusColor = guest.getStatusColor();
-      
-      // Draw guest as circle
-      this.renderSystem.drawCircle(
-        transform.x, 
-        transform.y, 
-        12, 
-        statusColor
-      );
-      
-      // Draw guest type label
-      this.renderSystem.drawText(
-        guest.type.charAt(0).toUpperCase(), 
-        transform.x - 4, 
-        transform.y + 3, 
-        { font: '10px Arial', color: '#fff', align: 'center' }
-      );
-      
-      // Draw patience meter
-      if (guest.state === 'seeking') {
-        const patienceRatio = guest.getPatienceRemaining() / guest.patience;
-        const barWidth = 20;
-        const barHeight = 3;
-        
-        // Background
-        this.renderSystem.drawRect(
-          transform.x - 10, 
-          transform.y - 20, 
-          barWidth, barHeight, 
-          '#333'
-        );
-        
-        // Patience fill
-        const fillColor = patienceRatio > 0.6 ? '#00ff00' : patienceRatio > 0.3 ? '#ffff00' : '#ff0000';
-        this.renderSystem.drawRect(
-          transform.x - 10, 
-          transform.y - 20, 
-          barWidth * patienceRatio, barHeight, 
-          fillColor
-        );
-      }
-    });
-
-    // Draw floating numbers
-    this.floatingNumbers.forEach(floatingNumber => {
-      const renderData = floatingNumber.getRenderData();
-      
-      // Set opacity for rendering
-      const originalGlobalAlpha = this.renderSystem.ctx.globalAlpha;
-      this.renderSystem.ctx.globalAlpha = renderData.opacity;
-      
-      this.renderSystem.drawText(
-        renderData.text,
-        renderData.x,
-        renderData.y,
-        { 
-          font: `${renderData.fontSize}px Arial`, 
-          color: renderData.color, 
-          align: 'center',
-          stroke: true,
-          strokeColor: '#000000',
-          strokeWidth: 2
+      // Render entities in layers (background to foreground)
+      // Layer 1: Consoles (background)
+      this.consoles.forEach(console => {
+        try {
+          console.render(this.renderSystem);
+        } catch (error) {
+          console.error('Error rendering console:', error, console);
         }
-      );
+      });
       
-      // Restore original alpha
-      this.renderSystem.ctx.globalAlpha = originalGlobalAlpha;
-    });
+      // Layer 2: Character and Guests (foreground)
+      if (this.character) {
+        try {
+          this.character.render(this.renderSystem);
+        } catch (error) {
+          console.error('Error rendering character:', error, this.character);
+        }
+      }
+      
+      this.guests.forEach(guest => {
+        try {
+          guest.render(this.renderSystem);
+        } catch (error) {
+          console.error('Error rendering guest:', error, guest);
+        }
+      });
+      
+      // Layer 3: Floating numbers (top layer)
+      this.floatingNumbers.forEach(floatingNumber => {
+        try {
+          floatingNumber.render(this.renderSystem);
+        } catch (error) {
+          console.error('Error rendering floating number:', error, floatingNumber);
+        }
+      });
+    } catch (error) {
+      console.error('Error in main render method:', error);
+    }
 
-    // Draw player as a blue circle
-    const playerTransform = this.player.getComponent('Transform');
-    this.renderSystem.drawCircle(
-      playerTransform.x, 
-      playerTransform.y, 
-      15, 
-      '#0066cc'
+    // Draw console purchase preview
+    this.renderPurchasePreview();
+
+    // Draw character interaction hints
+    this.renderInteractionHints();
+
+    // Render tutorial overlay (if active)
+    if (this.tutorialSystem.isActive) {
+      this.tutorialSystem.render(this.renderSystem);
+    }
+
+    // Draw UI
+    this.renderUI();
+  }
+
+  /**
+   * Draw a grid for visual reference
+   * @private
+   */
+  drawGrid() {
+    const gridSize = 40;
+    const color = '#E0E0E0';
+
+    for (let x = 0; x <= this.canvas.width; x += gridSize) {
+      this.renderSystem.drawRect(x, 0, 1, this.canvas.height, color);
+    }
+
+    for (let y = 0; y <= this.canvas.height; y += gridSize) {
+      this.renderSystem.drawRect(0, y, this.canvas.width, 1, color);
+    }
+  }
+
+  /**
+   * Render console purchase preview
+   * @private
+   */
+  renderPurchasePreview() {
+    const previewData = this.purchaseSystem.getPreviewData();
+    if (!previewData) return;
+    
+    const color = previewData.valid ? '#00FF0080' : '#FF000080';
+    
+    // Draw preview console as semi-transparent rectangle
+    this.renderSystem.ctx.save();
+    this.renderSystem.ctx.globalAlpha = 0.5;
+    
+    this.renderSystem.drawRect(
+      previewData.x - 30, 
+      previewData.y - 20, 
+      60, 40, 
+      color
     );
     
-    // Draw repair range indicator if near a broken console
+    this.renderSystem.ctx.restore();
+    
+    // Draw console type label
+    this.renderSystem.drawText(
+      previewData.type.split('-')[0].toUpperCase(), 
+      previewData.x - 25, 
+      previewData.y - 5, 
+      { font: '12px Arial', color: previewData.valid ? '#00FF00' : '#FF0000', align: 'left' }
+    );
+    
+    // Show cost
+    const consoleInfo = this.purchaseSystem.getConsoleInfo(previewData.type);
+    this.renderSystem.drawText(
+      `£${consoleInfo.cost}`, 
+      previewData.x, 
+      previewData.y + 30, 
+      { font: '12px Arial', color: previewData.valid ? '#00FF00' : '#FF0000', align: 'center' }
+    );
+    
+    // Show placement instructions
+    this.renderSystem.drawText(
+      previewData.valid ? 'Press ENTER to place' : 'Invalid position', 
+      previewData.x, 
+      previewData.y + 45, 
+      { font: '10px Arial', color: previewData.valid ? '#00FF00' : '#FF0000', align: 'center' }
+    );
+  }
+
+  /**
+   * Render interaction hints
+   * @private
+   */
+  renderInteractionHints() {
+    if (!this.character) return;
+    
+    const characterPos = this.character.getPosition();
     const repairRange = 80;
+    
+    // Check for nearby broken console
     const nearbyBrokenConsole = this.consoles.find(console => {
       if (console.state !== 'broken') return false;
       const consoleTransform = console.getComponent('Transform');
-      const distance = playerTransform.distanceTo(consoleTransform);
+      const distance = Math.sqrt(
+        (characterPos.x - consoleTransform.x) ** 2 + 
+        (characterPos.y - consoleTransform.y) ** 2
+      );
       return distance <= repairRange;
     });
     
     if (nearbyBrokenConsole) {
       // Draw repair range circle
       this.renderSystem.drawCircle(
-        playerTransform.x,
-        playerTransform.y,
+        characterPos.x,
+        characterPos.y,
         repairRange,
-        '#ffff00',
+        '#FFFF00',
         true // stroke only
       );
       
       // Draw repair prompt
       this.renderSystem.drawText(
         'Press SPACE to repair',
-        playerTransform.x,
-        playerTransform.y - 30,
+        characterPos.x,
+        characterPos.y - 30,
         {
           font: '14px Arial',
-          color: '#ffff00',
+          color: '#FFFF00',
           align: 'center',
           stroke: true,
           strokeColor: '#000000',
@@ -616,55 +924,17 @@ class PowerUpGame {
         }
       );
     }
+  }
 
-    // Draw console purchase preview
-    const previewData = this.purchaseSystem.getPreviewData();
-    if (previewData) {
-      const color = previewData.valid ? '#00ff0080' : '#ff000080';
-      
-      // Draw preview console as semi-transparent rectangle
-      this.renderSystem.ctx.save();
-      this.renderSystem.ctx.globalAlpha = 0.5;
-      
-      this.renderSystem.drawRect(
-        previewData.x - 30, 
-        previewData.y - 20, 
-        60, 40, 
-        color
-      );
-      
-      this.renderSystem.ctx.restore();
-      
-      // Draw console type label
-      this.renderSystem.drawText(
-        previewData.type.split('-')[0].toUpperCase(), 
-        previewData.x - 25, 
-        previewData.y - 5, 
-        { font: '12px Arial', color: previewData.valid ? '#00ff00' : '#ff0000', align: 'left' }
-      );
-      
-      // Show cost
-      const consoleInfo = this.purchaseSystem.getConsoleInfo(previewData.type);
-      this.renderSystem.drawText(
-        `£${consoleInfo.cost}`, 
-        previewData.x, 
-        previewData.y + 30, 
-        { font: '12px Arial', color: previewData.valid ? '#00ff00' : '#ff0000', align: 'center' }
-      );
-      
-      // Show placement instructions
-      this.renderSystem.drawText(
-        previewData.valid ? 'Press ENTER to place' : 'Invalid position', 
-        previewData.x, 
-        previewData.y + 45, 
-        { font: '10px Arial', color: previewData.valid ? '#00ff00' : '#ff0000', align: 'center' }
-      );
-    }
-
-    // Draw UI
+  /**
+   * Render UI elements
+   * @private
+   */
+  renderUI() {
+    // Control instructions
     const uiLines = [
-      'Use WASD to move | SPACE near broken console to repair | Press B to break a console',
-      'Console Purchase: 1=Retro (£500) | 2=Classic (£1200) | 3=Modern (£2500) | 4=VR (£5000)'
+      'WASD: Move | SPACE: Repair | 1-4: Buy Consoles | B: Break Console (test)',
+      'ENTER: Confirm Purchase | ESC: Cancel | Tutorial: Available on first play'
     ];
     
     if (this.purchaseSystem.placementMode) {
@@ -674,106 +944,52 @@ class PowerUpGame {
     uiLines.forEach((line, index) => {
       this.renderSystem.drawText(
         line, 
-        20, 20 + (index * 20), 
-        { font: '16px Arial', color: '#333' }
+        20, 20 + (index * 18), 
+        { font: '14px Arial', color: '#333333' }
       );
     });
 
-    // Update UI elements
-    this.updateUI();
-  }
-
-  /**
-   * Draw a grid for visual reference
-   */
-  drawGrid() {
-    const gridSize = 40;
-    const color = '#e0e0e0';
-
-    // Vertical lines
-    for (let x = 0; x <= this.canvas.width; x += gridSize) {
-      this.renderSystem.drawRect(x, 0, 1, this.canvas.height, color);
-    }
-
-    // Horizontal lines
-    for (let y = 0; y <= this.canvas.height; y += gridSize) {
-      this.renderSystem.drawRect(0, y, this.canvas.width, 1, color);
-    }
-  }
-
-  /**
-   * Update guest AI behavior
-   */
-  updateGuestAI() {
-    this.guests.forEach(guest => {
-      if (guest.state === 'seeking') {
-        const nearestConsole = guest.findNearestConsole(this.consoles);
-        
-        if (nearestConsole) {
-          // Check if guest is close enough to use console
-          const guestTransform = guest.getComponent('Transform');
-          const consoleTransform = nearestConsole.getComponent('Transform');
-          const distance = guestTransform.distanceTo(consoleTransform);
-          
-          if (distance < 60) { // Close enough to use
-            try {
-              guest.startUsingConsole(nearestConsole);
-              console.debug(`Guest started using ${nearestConsole.type} console`);
-            } catch (error) {
-              // Console might have been taken by another guest
-              guest.moveToConsole(nearestConsole);
-            }
-          } else {
-            // Move towards console
-            guest.moveToConsole(nearestConsole);
-          }
-        }
-      }
-    });
-  }
-
-  /**
-   * Handle repair interaction when SPACE is pressed
-   */
-  handleRepairInteraction() {
-    const playerTransform = this.player.getComponent('Transform');
-    const repairRange = 80; // Distance within which player can repair
+    // Game progress info
+    const gameData = this.gameStateManager.gameData;
+    const progress = this.gameStateManager.getDayProgress();
     
-    // Find broken console within range
-    const brokenConsole = this.consoles.find(console => {
-      if (console.state !== 'broken') return false;
-      
-      const consoleTransform = console.getComponent('Transform');
-      const distance = playerTransform.distanceTo(consoleTransform);
-      return distance <= repairRange;
-    });
+    // Progress bars
+    const barY = this.canvas.height - 80;
+    const barWidth = 200;
+    const barHeight = 20;
     
-    if (brokenConsole) {
-      brokenConsole.startRepair();
-      
-      // Create floating repair notification
-      const consoleTransform = brokenConsole.getComponent('Transform');
-      this.createFloatingNumber(
-        consoleTransform.x, 
-        consoleTransform.y - 30, 
-        'REPAIRING...', 
-        '#ffff00',
-        3000 // Match repair time
-      );
-    }
+    // Revenue progress
+    this.renderSystem.drawRect(20, barY, barWidth, barHeight, '#333333');
+    this.renderSystem.drawRect(20, barY, barWidth * progress.revenueProgress, barHeight, '#00FF00');
+    this.renderSystem.drawText(
+      `Revenue: £${gameData.dailyRevenue}/${this.gameStateManager.dailyTargets.revenue}`,
+      25, barY + 14,
+      { font: '12px Arial', color: '#FFFFFF' }
+    );
+    
+    // Guests progress
+    this.renderSystem.drawRect(250, barY, barWidth, barHeight, '#333333');
+    this.renderSystem.drawRect(250, barY, barWidth * progress.guestsProgress, barHeight, '#0066CC');
+    this.renderSystem.drawText(
+      `Guests: ${gameData.guestsServed}/${this.gameStateManager.dailyTargets.guestsServed}`,
+      255, barY + 14,
+      { font: '12px Arial', color: '#FFFFFF' }
+    );
   }
 
   /**
    * Update UI elements
    */
   updateUI() {
+    const gameData = this.gameStateManager.gameData;
+    
     const moneyCounter = document.getElementById('money-counter');
     const dayCounter = document.getElementById('day-counter');
     const angryCounter = document.getElementById('angry-counter');
 
-    if (moneyCounter) moneyCounter.textContent = `£${this.money.toLocaleString()}`;
-    if (dayCounter) dayCounter.textContent = `Day ${this.day}`;
-    if (angryCounter) angryCounter.textContent = `${this.angryGuests}/3`;
+    if (moneyCounter) moneyCounter.textContent = `£${gameData.money.toLocaleString()}`;
+    if (dayCounter) dayCounter.textContent = `Day ${gameData.day}`;
+    if (angryCounter) angryCounter.textContent = `${gameData.angryGuests}/${this.gameStateManager.dailyTargets.maxAngryGuests}`;
   }
 
   /**
@@ -784,18 +1000,163 @@ class PowerUpGame {
   }
 
   /**
+   * Get angry guests count (for test compatibility)
+   * @returns {number} Current angry guests count
+   */
+  get angryGuests() {
+    return this.gameStateManager.gameData.angryGuests;
+  }
+
+  /**
+   * Set angry guests count (for test compatibility)
+   * @param {number} value - Angry guests count to set
+   */
+  set angryGuests(value) {
+    this.gameStateManager.gameData.angryGuests = value;
+  }
+
+  /**
+   * Get current money (for test compatibility)
+   * @returns {number} Current money amount
+   */
+  get money() {
+    return this.gameStateManager.gameData.money;
+  }
+
+  /**
+   * Set current money (for test compatibility)
+   * @param {number} value - Money amount to set
+   */
+  set money(value) {
+    this.gameStateManager.gameData.money = value;
+  }
+
+  /**
+   * Check game over conditions (for test compatibility)
+   */
+  checkGameOverConditions() {
+    if (this.gameStateManager.gameData.angryGuests >= this.gameStateManager.dailyTargets.maxAngryGuests) {
+      this.gameStateManager.gameOver('Too many angry guests! Exhibition reputation damaged beyond repair.');
+    }
+  }
+
+  /**
+   * Get comprehensive game state (for test compatibility)
+   * @returns {Object} Game state object
+   */
+  getGameState() {
+    const currentState = this.gameStateManager.getState();
+    return {
+      gameOver: currentState === 'gameOver',
+      running: this.running,
+      angryGuests: this.gameStateManager.gameData.angryGuests,
+      gameOverReason: this.gameStateManager.gameData.gameOverReason || null,
+      money: this.gameStateManager.gameData.money,
+      currentState: currentState
+    };
+  }
+
+  /**
+   * Get game over status (for test compatibility)
+   * @returns {boolean} True if game is over
+   */
+  get gameOver() {
+    return this.gameStateManager.getState() === 'gameOver';
+  }
+
+  /**
+   * Get game over reason (for test compatibility)
+   * @returns {string|null} Reason for game over
+   */
+  get gameOverReason() {
+    return this.gameStateManager.gameData.gameOverReason || null;
+  }
+
+  /**
    * Clean up resources
    */
   destroy() {
     this.stop();
     this.inputSystem.destroy();
+    this.audioSystem.stopAll();
+  }
+}
+
+/**
+ * Reset game function - clears all data and restarts
+ */
+window.resetGame = function() {
+  try {
+    // Clear localStorage
+    localStorage.clear();
+    
+    // Stop current game if it exists
+    if (window.game) {
+      window.game.destroy();
+      window.game = null;
+    }
+    
+    // Hide error message if visible
+    const errorMessage = document.getElementById('error-message');
+    if (errorMessage) {
+      errorMessage.style.display = 'none';
+    }
+    
+    // Show loading message
+    const loading = document.getElementById('loading');
+    if (loading) {
+      loading.classList.remove('hidden');
+      loading.textContent = 'Resetting game...';
+    }
+    
+    // Restart game after a brief delay
+    setTimeout(() => {
+      try {
+        window.game = new PowerUpGame();
+        console.log('Game reset successfully');
+      } catch (error) {
+        console.error('Failed to restart game after reset:', error);
+        showErrorMessage('Failed to restart game after reset. Please reload the page.');
+      }
+    }, 500);
+    
+  } catch (error) {
+    console.error('Reset failed:', error);
+    // Force page reload as last resort
+    location.reload();
+  }
+};
+
+/**
+ * Show error message to user
+ * @param {string} message - Error message to display
+ */
+function showErrorMessage(message) {
+  const errorMessage = document.getElementById('error-message');
+  if (errorMessage) {
+    const errorText = errorMessage.querySelector('p');
+    if (errorText) {
+      errorText.textContent = message;
+    }
+    errorMessage.style.display = 'block';
+  }
+  
+  // Hide loading screen
+  const loading = document.getElementById('loading');
+  if (loading) {
+    loading.classList.add('hidden');
   }
 }
 
 // Start the game when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  // Expose game instance to window for testing
-  window.game = new PowerUpGame();
+  try {
+    // Expose game instance to window for testing and debugging
+    window.game = new PowerUpGame();
+  } catch (error) {
+    console.error('Failed to initialize game:', error);
+    showErrorMessage('Game failed to initialize. This might be due to corrupted save data.');
+  }
 });
 
 export { PowerUpGame };

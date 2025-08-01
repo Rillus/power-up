@@ -81,6 +81,9 @@ export class GameConsole extends Entity {
     this.state = 'operational'; // operational, in-use, broken, under-repair
     this.repairStartTime = null;
     this.currentUsers = [];
+    
+    // Event system
+    this.eventListeners = {};
   }
 
   /**
@@ -143,6 +146,13 @@ export class GameConsole extends Entity {
         this.state = 'operational';
         this.durability = this.maxDurability;
         this.repairStartTime = null;
+        
+        // Emit repair completed event
+        this.emit('repairCompleted', {
+          console: this,
+          x: this.x,
+          y: this.y
+        });
       }
     }
   }
@@ -195,6 +205,91 @@ export class GameConsole extends Entity {
   }
 
   /**
+   * Render the console
+   * @param {RenderSystem} renderer - The render system
+   */
+  render(renderer) {
+    super.render(renderer);
+    
+    const transform = this.getComponent('Transform');
+    if (!transform) return;
+    
+    // Draw console base
+    const color = this.getStatusColor();
+    renderer.drawRect(
+      transform.x - 30,
+      transform.y - 20,
+      60,
+      40,
+      color
+    );
+    
+    // Draw console border
+    renderer.drawRect(
+      transform.x - 32,
+      transform.y - 22,
+      64,
+      44,
+      '#000000',
+      true // stroke only
+    );
+    
+    // Draw console type label
+    const typeLabel = this.type.split('-')[0].toUpperCase();
+    renderer.drawText(
+      typeLabel,
+      transform.x,
+      transform.y - 5,
+      {
+        font: '12px Arial',
+        color: '#FFFFFF',
+        align: 'center',
+        stroke: true,
+        strokeColor: '#000000',
+        strokeWidth: 1
+      }
+    );
+    
+    // Draw durability bar
+    const barWidth = 50;
+    const barHeight = 4;
+    const barX = transform.x - barWidth / 2;
+    const barY = transform.y + 15;
+    
+    // Background bar
+    renderer.drawRect(barX, barY, barWidth, barHeight, '#333333');
+    
+    // Durability bar
+    const durabilityRatio = this.durability / this.maxDurability;
+    const durabilityColor = durabilityRatio > 0.5 ? '#00FF00' : durabilityRatio > 0.2 ? '#FFFF00' : '#FF0000';
+    renderer.drawRect(barX, barY, barWidth * durabilityRatio, barHeight, durabilityColor);
+    
+    // Draw repair progress if under repair
+    if (this.state === 'under-repair') {
+      const progress = this.getRepairProgress();
+      const progressBarY = transform.y + 25;
+      
+      // Progress background
+      renderer.drawRect(barX, progressBarY, barWidth, barHeight, '#333333');
+      
+      // Progress bar
+      renderer.drawRect(barX, progressBarY, barWidth * progress, barHeight, '#00FFFF');
+      
+      // Progress text
+      renderer.drawText(
+        'REPAIRING...',
+        transform.x,
+        transform.y + 35,
+        {
+          font: '10px Arial',
+          color: '#FFFF00',
+          align: 'center'
+        }
+      );
+    }
+  }
+
+  /**
    * Get repair progress as percentage
    * @returns {number} Progress from 0 to 1, or 0 if not repairing
    */
@@ -205,5 +300,48 @@ export class GameConsole extends Entity {
     
     const elapsed = Date.now() - this.repairStartTime;
     return Math.min(elapsed / this.repairTime, 1);
+  }
+
+  /**
+   * Register event listener
+   * @param {string} event - Event name
+   * @param {Function} callback - Callback function
+   */
+  on(event, callback) {
+    if (!this.eventListeners[event]) {
+      this.eventListeners[event] = [];
+    }
+    this.eventListeners[event].push(callback);
+  }
+
+  /**
+   * Unregister event listener
+   * @param {string} event - Event name
+   * @param {Function} callback - Callback function to remove
+   */
+  off(event, callback) {
+    if (this.eventListeners[event]) {
+      const index = this.eventListeners[event].indexOf(callback);
+      if (index > -1) {
+        this.eventListeners[event].splice(index, 1);
+      }
+    }
+  }
+
+  /**
+   * Emit event to all listeners
+   * @param {string} event - Event name
+   * @param {*} data - Event data
+   */
+  emit(event, data) {
+    if (this.eventListeners[event]) {
+      this.eventListeners[event].forEach(callback => {
+        try {
+          callback(data);
+        } catch (error) {
+          console.error(`Error in event listener for ${event}:`, error);
+        }
+      });
+    }
   }
 }

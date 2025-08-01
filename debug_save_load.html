@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Save/Load Debug Test</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        #log { border: 1px solid #ccc; padding: 10px; height: 200px; overflow-y: scroll; margin: 10px 0; }
+        button { margin: 5px; padding: 10px; }
+        canvas { border: 1px solid #000; margin: 10px 0; }
+    </style>
+</head>
+<body>
+    <h2>Save/Load Debug Test</h2>
+    <p>This test simulates the save/load cycle to identify issues.</p>
+    
+    <button onclick="startNewGame()">Start New Game</button>
+    <button onclick="saveGame()">Save Game</button>
+    <button onclick="loadGame()">Load Game</button>
+    <button onclick="clearSave()">Clear Save Data</button>
+    <button onclick="checkCanvas()">Check Canvas</button>
+    
+    <canvas id="test-canvas" width="800" height="600"></canvas>
+    
+    <div id="log"></div>
+    
+    <script type="module">
+        import { PowerUpGame } from './src/main.js';
+        
+        let game = null;
+        
+        function log(message) {
+            const logDiv = document.getElementById('log');
+            logDiv.innerHTML += new Date().toLocaleTimeString() + ': ' + message + '<br>';
+            logDiv.scrollTop = logDiv.scrollHeight;
+            console.log(message);
+        }
+        
+        window.startNewGame = function() {
+            try {
+                if (game) {
+                    game.destroy();
+                }
+                
+                // Clear any existing save data
+                localStorage.clear();
+                
+                log('Starting new game...');
+                const canvas = document.getElementById('test-canvas');
+                
+                // Create minimal game setup
+                game = new PowerUpGame();
+                log('New game created successfully');
+                log('Canvas context: ' + (game.renderSystem.ctx ? 'OK' : 'MISSING'));
+                log('Game state: ' + game.gameStateManager.getState());
+                
+            } catch (error) {
+                log('ERROR starting new game: ' + error.message);
+                console.error(error);
+            }
+        };
+        
+        window.saveGame = function() {
+            try {
+                if (!game) {
+                    log('No game to save');
+                    return;
+                }
+                
+                log('Saving game...');
+                game.gameStateManager.saveGameState();
+                log('Game saved successfully');
+                
+                // Check what was saved
+                const saved = localStorage.getItem('powerUp_gameState');
+                log('Saved data size: ' + (saved ? saved.length : 0) + ' characters');
+                
+            } catch (error) {
+                log('ERROR saving game: ' + error.message);
+                console.error(error);
+            }
+        };
+        
+        window.loadGame = function() {
+            try {
+                if (game) {
+                    game.destroy();
+                    game = null;
+                }
+                
+                log('Loading saved game...');
+                
+                // Check if save data exists
+                const saved = localStorage.getItem('powerUp_gameState');
+                if (!saved) {
+                    log('No save data found');
+                    return;
+                }
+                
+                log('Found save data, creating game...');
+                game = new PowerUpGame();
+                log('Game loaded successfully');
+                log('Game state after load: ' + game.gameStateManager.getState());
+                log('Entities count: ' + game.entities.length);
+                log('Character exists: ' + (game.character ? 'YES' : 'NO'));
+                log('Consoles count: ' + game.consoles.length);
+                
+            } catch (error) {
+                log('ERROR loading game: ' + error.message);
+                console.error(error);
+            }
+        };
+        
+        window.clearSave = function() {
+            localStorage.clear();
+            log('Save data cleared');
+        };
+        
+        window.checkCanvas = function() {
+            if (!game) {
+                log('No game to check');
+                return;
+            }
+            
+            const canvas = document.getElementById('test-canvas');
+            const ctx = canvas.getContext('2d');
+            
+            log('Canvas size: ' + canvas.width + 'x' + canvas.height);
+            log('Context exists: ' + (ctx ? 'YES' : 'NO'));
+            log('Game render system: ' + (game.renderSystem ? 'OK' : 'MISSING'));
+            log('Render system context: ' + (game.renderSystem && game.renderSystem.ctx ? 'OK' : 'MISSING'));
+            
+            // Try a test render
+            try {
+                ctx.fillStyle = '#ff0000';
+                ctx.fillRect(10, 10, 50, 50);
+                log('Test rectangle drawn successfully');
+            } catch (error) {
+                log('ERROR drawing test rectangle: ' + error.message);
+            }
+        };
+        
+        // Initial setup
+        log('Debug test loaded. Click buttons to test save/load functionality.');
+    </script>
+</body>
+</html>
