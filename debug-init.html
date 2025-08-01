@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Debug Game Initialization</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .error { color: red; background: #ffe6e6; padding: 10px; margin: 10px 0; }
+        .success { color: green; background: #e6ffe6; padding: 10px; margin: 10px 0; }
+        pre { background: #f5f5f5; padding: 10px; overflow: auto; }
+    </style>
+</head>
+<body>
+    <h1>Game Initialization Debug</h1>
+    <div id="messages"></div>
+    
+    <script type="module">
+        const messages = document.getElementById('messages');
+        
+        function addMessage(message, type = 'info') {
+            const div = document.createElement('div');
+            div.className = type;
+            div.innerHTML = message;
+            messages.appendChild(div);
+        }
+        
+        // Clear localStorage
+        try {
+            localStorage.clear();
+            addMessage('✓ localStorage cleared', 'success');
+        } catch (e) {
+            addMessage('✗ Failed to clear localStorage: ' + e.message, 'error');
+        }
+        
+        // Test imports one by one
+        try {
+            addMessage('Testing imports...');
+            
+            // Test Wall entity
+            const { Wall } = await import('./src/entities/Wall.js');
+            addMessage('✓ Wall.js imported successfully', 'success');
+            
+            // Test WallSystem
+            const { WallSystem } = await import('./src/systems/WallSystem.js');
+            addMessage('✓ WallSystem.js imported successfully', 'success');
+            
+            // Test main game
+            const { PowerUpGame } = await import('./src/main.js');
+            addMessage('✓ PowerUpGame imported successfully', 'success');
+            
+            // Try to create game instance
+            window.game = new PowerUpGame();
+            addMessage('✓ Game instance created successfully', 'success');
+            
+        } catch (error) {
+            addMessage('✗ Import/initialization failed: ' + error.message, 'error');
+            addMessage('<pre>' + error.stack + '</pre>', 'error');
+        }
+    </script>
+</body>
+</html>

@@ -30,12 +30,15 @@ test.describe('Floating Numbers System', () => {
     
     expect(floatingNumberCount).toBeGreaterThan(0);
     
-    // Verify it's a money number
-    const floatingNumberText = await page.evaluate(() => {
-      return window.game.floatingNumbers[0].text;
+    // Verify there's a money number among the floating numbers
+    const moneyFloatingNumbers = await page.evaluate(() => {
+      return window.game.floatingNumbers
+        .map(fn => fn.text)
+        .filter(text => /^\+£\d+$/.test(text));
     });
     
-    expect(floatingNumberText).toMatch(/^\+£\d+$/);
+    expect(moneyFloatingNumbers.length).toBeGreaterThan(0);
+    expect(moneyFloatingNumbers[0]).toMatch(/^\+£\d+$/);
   });
 
   test('should display repair notification when starting repair', async ({ page }) => {

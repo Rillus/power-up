@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repair Master Test</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #f0f0f0;
+        }
+        #console {
+            background-color: #000;
+            color: #00ff00;
+            padding: 20px;
+            margin: 20px 0;
+            font-family: monospace;
+            height: 400px;
+            overflow-y: auto;
+            border: 2px solid #333;
+        }
+        button {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Repair Master Power-up Test</h1>
+    <p>This test demonstrates the Repair Master power-up functionality.</p>
+    
+    <div>
+        <button onclick="createBrokenConsole()">Create Broken Console</button>
+        <button onclick="spawnRepairMasterPowerUp()">Spawn Repair Master Power-up</button>
+        <button onclick="collectRepairMaster()">Collect Repair Master</button>
+        <button onclick="repairConsole()">Repair Console</button>
+        <button onclick="clearLog()">Clear Log</button>
+    </div>
+    
+    <div id="console"></div>
+
+    <script type="module">
+        import { Character } from './src/entities/Character.js';
+        import { GameConsole } from './src/entities/GameConsole.js';
+        import { PowerUpManager } from './src/systems/PowerUpManager.js';
+        import { PowerUp } from './src/entities/PowerUp.js';
+
+        // Create test objects
+        const character = new Character(400, 300);
+        const gameConsole = new GameConsole(300, 200, 'retro-arcade');
+        
+        // Mock game object
+        const mockGame = {
+            canvas: { width: 800, height: 600 },
+            character: character,
+            consoles: [gameConsole],
+            powerUps: [],
+            entities: [],
+            audioSystem: {
+                playRepairSound: () => log('🔊 Playing repair sound'),
+                playPowerUpSound: () => log('🔊 Playing power-up sound')
+            },
+            createFloatingNumber: (x, y, text, color) => {
+                log(`💬 Floating text: "${text}" at (${x}, ${y}) in ${color}`);
+            }
+        };
+
+        const powerUpManager = new PowerUpManager(mockGame);
+        let repairMasterPowerUp = null;
+
+        function log(message) {
+            const console = document.getElementById('console');
+            const time = new Date().toLocaleTimeString();
+            console.innerHTML += `[${time}] ${message}\n`;
+            console.scrollTop = console.scrollHeight;
+        }
+
+        function createBrokenConsole() {
+            gameConsole.durability = 0;
+            gameConsole.state = 'broken';
+            log(`🔧 Created broken ${gameConsole.type} console at (${gameConsole.x}, ${gameConsole.y})`);
+            log(`📊 Console repair time: ${gameConsole.repairTime}ms`);
+        }
+
+        function spawnRepairMasterPowerUp() {
+            repairMasterPowerUp = new PowerUp(350, 250, 'repair-master');
+            mockGame.powerUps.push(repairMasterPowerUp);
+            mockGame.entities.push(repairMasterPowerUp);
+            log(`⚡ Spawned Repair Master power-up at (350, 250)`);
+            log(`📋 Power-up config: ${repairMasterPowerUp.config.name} - ${repairMasterPowerUp.config.description}`);
+        }
+
+        function collectRepairMaster() {
+            if (!repairMasterPowerUp) {
+                log('❌ No Repair Master power-up to collect!');
+                return;
+            }
+            
+            // Simulate collection
+            repairMasterPowerUp.collect(character);
+            
+            log(`✨ Character collected Repair Master power-up!`);
+            log(`📈 Character repair multiplier: ${character.repairMultiplier}x`);
+            log(`🎯 Character has repair boost: ${character.hasRepairBoost}`);
+        }
+
+        function repairConsole() {
+            if (gameConsole.state !== 'broken') {
+                log('❌ Console is not broken! Create a broken console first.');
+                return;
+            }
+
+            const repairMultiplier = character.repairMultiplier || 1.0;
+            const originalRepairTime = gameConsole.repairTime;
+            
+            log(`🔧 Starting repair with ${repairMultiplier}x multiplier...`);
+            log(`⏱️ Original repair time: ${originalRepairTime}ms`);
+            
+            try {
+                gameConsole.startRepair(repairMultiplier);
+                log(`⏱️ Effective repair time: ${gameConsole.effectiveRepairTime}ms`);
+                log(`🚀 Repair speed increase: ${((originalRepairTime / gameConsole.effectiveRepairTime) * 100).toFixed(1)}%`);
+                
+                // Simulate repair completion
+                setTimeout(() => {
+                    gameConsole.updateRepair();
+                    if (gameConsole.state === 'operational') {
+                        log(`✅ Repair completed! Console is now operational.`);
+                        log(`💪 Console durability restored to ${gameConsole.durability}/${gameConsole.maxDurability}`);
+                    } else {
+                        log(`⏳ Repair in progress... ${(gameConsole.getRepairProgress() * 100).toFixed(1)}% complete`);
+                    }
+                }, gameConsole.effectiveRepairTime + 100);
+                
+            } catch (error) {
+                log(`❌ Error: ${error.message}`);
+            }
+        }
+
+        function clearLog() {
+            document.getElementById('console').innerHTML = '';
+        }
+
+        // Make functions available globally
+        window.createBrokenConsole = createBrokenConsole;
+        window.spawnRepairMasterPowerUp = spawnRepairMasterPowerUp;
+        window.collectRepairMaster = collectRepairMaster;
+        window.repairConsole = repairConsole;
+        window.clearLog = clearLog;
+
+        // Set up power-up manager event handling
+        powerUpManager.on('powerUpCollected', (data) => {
+            log(`🎉 Power-up Manager: ${data.character.name} collected ${data.config.name}`);
+        });
+
+        powerUpManager.on('effectActivated', (data) => {
+            log(`⚡ Effect activated: ${data.type} for ${data.duration/1000} seconds`);
+        });
+
+        // Initial log
+        log('🎮 Repair Master Test Environment Ready!');
+        log('📝 Instructions:');
+        log('1. Create a broken console');
+        log('2. Spawn a Repair Master power-up');
+        log('3. Collect the power-up (character gets 10x repair speed)');
+        log('4. Repair the console (should be nearly instant)');
+        log('');
+    </script>
+</body>
+</html>

@@ -36,7 +36,7 @@ test.describe('Guest System', () => {
       };
     });
     
-    expect(['casual', 'enthusiast', 'impatient', 'collector']).toContain(guestData.type);
+    expect(['casual', 'family', 'enthusiast', 'tourist']).toContain(guestData.type);
     expect(guestData.state).toBe('seeking');
     expect(guestData.satisfaction).toBeGreaterThan(0);
     expect(guestData.patience).toBeGreaterThan(0);
@@ -177,6 +177,79 @@ test.describe('Guest System', () => {
     expect(statusColors.using).toBe('#0066ff'); // Blue
     expect(statusColors.leaving).toBe('#888888'); // Gray
     expect(statusColors.angry).toBe('#ff0000'); // Red
+  });
+
+  test('should display guest emotions correctly', async ({ page }) => {
+    // Test guest emotion system
+    const emotionData = await page.evaluate(() => {
+      const guest = window.game.spawnGuest();
+      
+      // Test different satisfaction levels
+      const emotions = {};
+      
+      // Very happy
+      guest.satisfaction = 9;
+      emotions.veryHappy = {
+        state: guest.getEmotionState(),
+        icon: guest.getEmotionIcon(),
+        color: guest.getEmotionColor()
+      };
+      
+      // Happy
+      guest.satisfaction = 7;
+      emotions.happy = {
+        state: guest.getEmotionState(),
+        icon: guest.getEmotionIcon(),
+        color: guest.getEmotionColor()
+      };
+      
+      // Neutral
+      guest.satisfaction = 5;
+      emotions.neutral = {
+        state: guest.getEmotionState(),
+        icon: guest.getEmotionIcon(),
+        color: guest.getEmotionColor()
+      };
+      
+      // Unhappy
+      guest.satisfaction = 3;
+      emotions.unhappy = {
+        state: guest.getEmotionState(),
+        icon: guest.getEmotionIcon(),
+        color: guest.getEmotionColor()
+      };
+      
+      // Angry by state override
+      guest.state = 'angry';
+      emotions.angry = {
+        state: guest.getEmotionState(),
+        icon: guest.getEmotionIcon(),
+        color: guest.getEmotionColor()
+      };
+      
+      return emotions;
+    });
+    
+    // Verify emotion states
+    expect(emotionData.veryHappy.state).toBe('very-happy');
+    expect(emotionData.veryHappy.icon).toBe('😄');
+    expect(emotionData.veryHappy.color).toBe('#00FF00');
+    
+    expect(emotionData.happy.state).toBe('happy');
+    expect(emotionData.happy.icon).toBe('😊');
+    expect(emotionData.happy.color).toBe('#90EE90');
+    
+    expect(emotionData.neutral.state).toBe('neutral');
+    expect(emotionData.neutral.icon).toBe('😐');
+    expect(emotionData.neutral.color).toBe('#FFFF00');
+    
+    expect(emotionData.unhappy.state).toBe('unhappy');
+    expect(emotionData.unhappy.icon).toBe('😕');
+    expect(emotionData.unhappy.color).toBe('#FFA500');
+    
+    expect(emotionData.angry.state).toBe('angry');
+    expect(emotionData.angry.icon).toBe('😠');
+    expect(emotionData.angry.color).toBe('#FF0000');
   });
 
   test('should remove guests when they exit', async ({ page }) => {

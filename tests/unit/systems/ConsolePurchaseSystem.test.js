@@ -40,10 +40,34 @@ describe('ConsolePurchaseSystem', () => {
 
     it('should initialize with console types and costs', () => {
       expect(purchaseSystem.consoleTypes).toEqual({
-        'retro-arcade': { cost: 500, name: 'Retro Arcade' },
-        'classic-home': { cost: 1200, name: 'Classic Home' },
-        'modern-gaming': { cost: 2500, name: 'Modern Gaming' },
-        'vr-experience': { cost: 5000, name: 'VR Experience' }
+        'retro-arcade': { 
+          cost: 500, 
+          name: 'Retro Arcade',
+          description: 'Basic console - appeals to casual guests',
+          revenue: '£2/use',
+          capacity: '1 guest'
+        },
+        'classic-home': { 
+          cost: 1200, 
+          name: 'Classic Home',
+          description: 'Mid-tier console - appeals to families, serves 2 guests',
+          revenue: '£4/use + £1 bonus',
+          capacity: '2 guests'
+        },
+        'modern-gaming': { 
+          cost: 2500, 
+          name: 'Modern Gaming',
+          description: 'High-tier console - appeals to enthusiasts',
+          revenue: '£6/use + £2 bonus',
+          capacity: '2 guests'
+        },
+        'vr-experience': { 
+          cost: 5000, 
+          name: 'VR Experience',
+          description: 'Premium console - maximum appeal to enthusiasts',
+          revenue: '£10/use + £4 bonus',
+          capacity: '1 guest'
+        }
       });
     });
   });
@@ -251,7 +275,10 @@ describe('ConsolePurchaseSystem', () => {
       
       expect(info).toEqual({
         cost: 500,
-        name: 'Retro Arcade'
+        name: 'Retro Arcade',
+        description: 'Basic console - appeals to casual guests',
+        revenue: '£2/use',
+        capacity: '1 guest'
       });
     });
 
@@ -267,10 +294,42 @@ describe('ConsolePurchaseSystem', () => {
       const menu = purchaseSystem.getPurchaseMenu();
       
       expect(menu).toEqual([
-        { type: 'retro-arcade', name: 'Retro Arcade', cost: 500, affordable: true },
-        { type: 'classic-home', name: 'Classic Home', cost: 1200, affordable: true },
-        { type: 'modern-gaming', name: 'Modern Gaming', cost: 2500, affordable: false },
-        { type: 'vr-experience', name: 'VR Experience', cost: 5000, affordable: false }
+        { 
+          type: 'retro-arcade', 
+          name: 'Retro Arcade', 
+          cost: 500, 
+          description: 'Basic console - appeals to casual guests',
+          revenue: '£2/use',
+          capacity: '1 guest',
+          affordable: true 
+        },
+        { 
+          type: 'classic-home', 
+          name: 'Classic Home', 
+          cost: 1200, 
+          description: 'Mid-tier console - appeals to families, serves 2 guests',
+          revenue: '£4/use + £1 bonus',
+          capacity: '2 guests',
+          affordable: true
+        },
+        { 
+          type: 'modern-gaming', 
+          name: 'Modern Gaming', 
+          cost: 2500, 
+          description: 'High-tier console - appeals to enthusiasts',
+          revenue: '£6/use + £2 bonus',
+          capacity: '2 guests',
+          affordable: false 
+        },
+        { 
+          type: 'vr-experience', 
+          name: 'VR Experience', 
+          cost: 5000, 
+          description: 'Premium console - maximum appeal to enthusiasts',
+          revenue: '£10/use + £4 bonus',
+          capacity: '1 guest',
+          affordable: false 
+        }
       ]);
     });
   });

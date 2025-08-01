@@ -84,8 +84,12 @@ export class Movement extends Component {
    * @private
    */
   updateVelocity() {
-    this.velocity.x = this.direction.x * this.speed;
-    this.velocity.y = this.direction.y * this.speed;
+    // Get speed multiplier from parent entity if available
+    const speedMultiplier = this.entity?.speedMultiplier || 1.0;
+    const effectiveSpeed = this.speed * speedMultiplier;
+    
+    this.velocity.x = this.direction.x * effectiveSpeed;
+    this.velocity.y = this.direction.y * effectiveSpeed;
   }
 
   /**

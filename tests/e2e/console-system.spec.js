@@ -3,6 +3,12 @@ import { test, expect } from '@playwright/test';
 test.describe('Console System', () => {
   test.beforeEach(async ({ page }) => {
     await page.goto('/');
+    
+    // Clear localStorage to prevent corrupted save data issues
+    await page.evaluate(() => localStorage.clear());
+    
+    // Reload page after clearing localStorage
+    await page.reload();
     await page.waitForSelector('#game-canvas');
     await page.waitForFunction(() => window.game !== undefined);
   });

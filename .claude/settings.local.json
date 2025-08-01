@@ -12,7 +12,9 @@
       "Bash(npm test:*)",
       "Bash(node:*)",
       "Bash(curl:*)",
-      "Bash(npx vitest run:*)"
+      "Bash(npx vitest run:*)",
+      "Bash(grep:*)",
+      "Bash(python3:*)"
     ],
     "deny": []
   }

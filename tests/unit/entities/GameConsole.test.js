@@ -42,7 +42,7 @@ describe('GameConsole', () => {
       const classicConsole = new GameConsole(0, 0, 'classic-home');
       expect(classicConsole.type).toBe('classic-home');
       expect(classicConsole.cost).toBe(1200);
-      expect(classicConsole.revenue).toBe(3);
+      expect(classicConsole.revenue).toBe(4); // Updated from 3 to 4
       expect(classicConsole.capacity).toBe(2);
     });
 
@@ -173,6 +173,68 @@ describe('GameConsole', () => {
     it('should return yellow for under-repair', () => {
       console.state = 'under-repair';
       expect(console.getStatusColor()).toBe('#ffff00');
+    });
+  });
+
+  describe('queue management', () => {
+    let mockGuest;
+    
+    beforeEach(() => {
+      mockGuest = {
+        joinQueue: () => {},
+        leaveQueue: () => {},
+        updateQueuePosition: () => {},
+        queuePosition: -1
+      };
+    });
+    
+    it('should add guest to queue', () => {
+      const position = console.addToQueue(mockGuest);
+      
+      expect(console.queue).toContain(mockGuest);
+      expect(position).toBe(0);
+    });
+    
+    it('should remove guest from queue', () => {
+      console.addToQueue(mockGuest);
+      console.removeFromQueue(mockGuest);
+      
+      expect(console.queue).not.toContain(mockGuest);
+    });
+    
+    it('should get next guest in queue', () => {
+      const guest1 = { ...mockGuest };
+      const guest2 = { ...mockGuest };
+      
+      console.addToQueue(guest1);
+      console.addToQueue(guest2);
+      
+      expect(console.getNextInQueue()).toBe(guest1);
+    });
+    
+    it('should return null for next guest when queue is empty', () => {
+      expect(console.getNextInQueue()).toBeNull();
+    });
+    
+    it('should get correct queue length', () => {
+      expect(console.getQueueLength()).toBe(0);
+      
+      console.addToQueue(mockGuest);
+      expect(console.getQueueLength()).toBe(1);
+    });
+    
+    it('should check if console has queue', () => {
+      expect(console.hasQueue()).toBe(false);
+      
+      console.addToQueue(mockGuest);
+      expect(console.hasQueue()).toBe(true);
+    });
+    
+    it('should calculate total demand', () => {
+      console.currentUsers = ['user1'];
+      console.addToQueue(mockGuest);
+      
+      expect(console.getTotalDemand()).toBe(2);
     });
   });
 

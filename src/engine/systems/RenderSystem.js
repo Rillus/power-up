@@ -68,6 +68,24 @@ export class RenderSystem {
   }
 
   /**
+   * Draw a line
+   * @param {number} x1 - Start X position
+   * @param {number} y1 - Start Y position
+   * @param {number} x2 - End X position
+   * @param {number} y2 - End Y position
+   * @param {string} color - Line color
+   * @param {number} [width=1] - Line width
+   */
+  drawLine(x1, y1, x2, y2, color, width = 1) {
+    this.context.beginPath();
+    this.context.moveTo(x1, y1);
+    this.context.lineTo(x2, y2);
+    this.context.strokeStyle = color;
+    this.context.lineWidth = width;
+    this.context.stroke();
+  }
+
+  /**
    * Draw text
    * @param {string} text - Text to draw
    * @param {number} x - X position

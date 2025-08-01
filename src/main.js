@@ -6,9 +6,19 @@ import { GameConsole } from './entities/GameConsole.js';
 import { Guest } from './entities/Guest.js';
 import { FloatingNumber } from './entities/FloatingNumber.js';
 import { ConsolePurchaseSystem } from './systems/ConsolePurchaseSystem.js';
+import { ConsoleUpgradeSystem } from './systems/ConsoleUpgradeSystem.js';
+import { StrategicPlacementSystem } from './systems/StrategicPlacementSystem.js';
+import { QueueManager } from './systems/QueueManager.js';
+import { PowerUpManager } from './systems/PowerUpManager.js';
+import { CharacterUpgradeSystem } from './systems/CharacterUpgradeSystem.js';
+import { AchievementSystem } from './systems/AchievementSystem.js';
+import { ConsoleUnlockSystem } from './systems/ConsoleUnlockSystem.js';
+import { DifficultyScalingSystem } from './systems/DifficultyScalingSystem.js';
+import { WallSystem } from './systems/WallSystem.js';
 import { GameStateManager } from './systems/GameStateManager.js';
 import { SaveSystem } from './utils/SaveSystem.js';
 import { TutorialSystem } from './systems/TutorialSystem.js';
+import { Pathfinding } from './utils/Pathfinding.js';
 
 /**
  * Main game application
@@ -30,20 +40,32 @@ class PowerUpGame {
     // Initialize game systems
     this.gameStateManager = new GameStateManager(this.saveSystem, this.audioSystem);
     this.purchaseSystem = new ConsolePurchaseSystem(this);
-    this.tutorialSystem = new TutorialSystem(this.saveSystem);
-    
-    // Game entities
+    this.upgradeSystem = new ConsoleUpgradeSystem(this);
+    this.placementSystem = new StrategicPlacementSystem(this);
+    this.queueManager = new QueueManager(this);
+    this.powerUpManager = new PowerUpManager(this);
+    this.characterUpgradeSystem = new CharacterUpgradeSystem(this, this.gameStateManager);
+    this.achievementSystem = new AchievementSystem(this, this.gameStateManager);
+    this.consoleUnlockSystem = new ConsoleUnlockSystem(this, this.gameStateManager);
+    // Initialize game entities arrays first (needed by systems)
     this.entities = [];
     this.character = null;
     this.consoles = [];
     this.guests = [];
+    this.powerUps = [];
     this.floatingNumbers = [];
+    
+    this.difficultyScalingSystem = new DifficultyScalingSystem(this, this.gameStateManager);
+    this.wallSystem = new WallSystem(this);
+    this.pathfinding = new Pathfinding(40); // 40px grid for pathfinding
+    this.tutorialSystem = new TutorialSystem(this.saveSystem);
     
     // Game timing
     this.running = false;
     this.lastTime = 0;
     this.lastGuestSpawn = 0;
     this.guestSpawnInterval = 8000; // 8 seconds between guests initially
+    this.frameCount = 0; // For periodic updates
     
     // Bind event handlers
     this.setupEventHandlers();
@@ -97,6 +119,23 @@ class PowerUpGame {
       
       // Create the console entity
       this.createConsole(data.x, data.y, data.type);
+    });
+    
+    // Upgrade system events
+    this.upgradeSystem.on('upgradeComplete', (data) => {
+      this.audioSystem.playClickSound();
+      
+      // Create upgrade notification
+      this.createFloatingNumber(
+        data.x,
+        data.y - 50,
+        `UPGRADED TO T${data.newTier}!`,
+        '#FFD700',
+        2000
+      );
+      
+      // Update UI to reflect money change
+      this.updateUI();
     });
   }
 
@@ -192,6 +231,16 @@ class PowerUpGame {
       speed: 200
     });
     
+    // Update character boundaries based on wall system
+    if (this.wallSystem) {
+      this.character.updateBoundaries(this.wallSystem.getPlayableArea());
+    }
+    
+    // Apply any existing character upgrades
+    if (this.characterUpgradeSystem) {
+      this.characterUpgradeSystem.applyAllUpgrades();
+    }
+    
     // Alias for test compatibility
     this.player = this.character;
     
@@ -220,6 +269,11 @@ class PowerUpGame {
       );
       
       this.audioSystem.playRepairSound();
+      
+      // Update repair achievement
+      if (this.achievementSystem) {
+        this.achievementSystem.updateAchievement('repair-expert', 1);
+      }
     });
     
     this.consoles.push(console);
@@ -232,15 +286,21 @@ class PowerUpGame {
    * @returns {Guest} Created guest
    */
   spawnGuest() {
-    const guestTypes = ['casual', 'enthusiast', 'impatient', 'collector'];
-    const randomType = guestTypes[Math.floor(Math.random() * guestTypes.length)];
+    // Use difficulty-scaled guest type distribution
+    const randomType = this.difficultyScalingSystem.getRandomGuestType();
     
     // Spawn at entrance (right side of screen)
     const guest = new Guest(750, 200 + Math.random() * 200, randomType);
     
-    // Set initial target near entrance
-    guest.targetX = 600;
-    guest.targetY = guest.y;
+    // Apply difficulty scaling to guest patience
+    const patienceModifier = this.difficultyScalingSystem.getGuestPatienceModifier();
+    guest.patience = Math.floor(guest.patience * patienceModifier);
+    
+    // Set pathfinding reference
+    guest.pathfinding = this.pathfinding;
+    
+    // Set initial target near entrance using pathfinding
+    guest.setPathfindingTarget(600, guest.y);
     
     this.guests.push(guest);
     this.entities.push(guest);
@@ -296,6 +356,13 @@ class PowerUpGame {
       }
     }
 
+    // Initialize character upgrade system after everything is loaded
+    this.characterUpgradeSystem.initialize();
+    
+    // Initialize pathfinding grid
+    this.pathfinding.initializeGrid(this.canvas.width, this.canvas.height);
+    this.updatePathfindingObstacles();
+    
     console.debug('Power Up game initialized');
   }
 
@@ -310,6 +377,7 @@ class PowerUpGame {
     this.entities = [];
     this.consoles = [];
     this.guests = [];
+    this.powerUps = [];
     this.floatingNumbers = [];
     this.character = null;
     
@@ -361,6 +429,7 @@ class PowerUpGame {
     this.entities = [];
     this.consoles = [];
     this.guests = [];
+    this.powerUps = [];
     this.floatingNumbers = [];
     
     // Create character at canvas center
@@ -434,6 +503,9 @@ class PowerUpGame {
    * @param {number} deltaTime - Time elapsed since last update
    */
   update(deltaTime) {
+    // Increment frame counter
+    this.frameCount++;
+    
     // Handle character input
     this.handleCharacterInput(deltaTime);
     
@@ -446,6 +518,26 @@ class PowerUpGame {
     // Handle repair interaction
     if (this.inputSystem.isKeyJustPressed('Space')) {
       this.handleRepairInteraction();
+    }
+    
+        // Handle power-up spawning for testing
+    if (this.inputSystem.isKeyJustPressed('KeyP')) {
+      this.spawnTestPowerUp();
+    }
+
+    // Handle wall visibility toggle
+    if (this.inputSystem.isKeyJustPressed('KeyV')) {
+      this.wallSystem.handleKeyPress('KeyV');
+    }
+
+    // Handle wall system info
+    if (this.inputSystem.isKeyJustPressed('KeyW')) {
+      this.wallSystem.handleKeyPress('KeyW');
+    }
+
+    // Handle character upgrade menu
+    if (this.inputSystem.isKeyJustPressed('KeyU')) {
+      this.characterUpgradeSystem.toggleUpgradeMenu();
     }
     
     // Guest spawning
@@ -462,6 +554,35 @@ class PowerUpGame {
     
     // Update console breakdown simulation
     this.updateConsoleBreakdowns();
+    
+    // Update strategic placement analysis
+    this.placementSystem.update(deltaTime);
+    
+    // Update queue management
+    this.queueManager.update(deltaTime);
+    
+    // Update power-up system
+    this.powerUpManager.update(deltaTime);
+    
+    // Update character upgrade system
+    this.characterUpgradeSystem.update(deltaTime);
+    
+    // Update achievement system
+    this.achievementSystem.update(deltaTime);
+    
+    // Update console unlock system
+    this.consoleUnlockSystem.update(deltaTime);
+    
+    // Update difficulty scaling system
+    this.difficultyScalingSystem.update(deltaTime);
+    
+    // Update wall system
+    this.wallSystem.update(deltaTime);
+    
+    // Update pathfinding obstacles (every few frames to avoid performance issues)
+    if (this.frameCount % 10 === 0) { // Update every 10 frames
+      this.updatePathfindingObstacles();
+    }
     
     // Update all entities
     this.entities.forEach(entity => {
@@ -506,6 +627,21 @@ class PowerUpGame {
     const pressedKeys = this.inputSystem.getJustPressedKeys();
     pressedKeys.forEach(key => {
       this.tutorialSystem.handleKeyPress(key);
+      
+      // Handle upgrade system keyboard shortcuts
+      this.characterUpgradeSystem.handleKeyPress(key);
+      
+      // Handle achievement system keyboard shortcuts
+      this.achievementSystem.handleKeyPress(key);
+      
+      // Handle console unlock system keyboard shortcuts  
+      this.consoleUnlockSystem.handleKeyPress(key);
+      
+      // Handle difficulty scaling system keyboard shortcuts
+      this.difficultyScalingSystem.handleKeyPress(key);
+      
+      // Handle wall system keyboard shortcuts
+      this.wallSystem.handleKeyPress(key);
     });
   }
 
@@ -546,12 +682,62 @@ class PowerUpGame {
   }
 
   /**
-   * Update guest spawning
+   * Update pathfinding obstacles based on current game state
+   */
+  updatePathfindingObstacles() {
+    if (!this.pathfinding) return;
+    
+    const obstacles = [];
+    
+    // Add walls as obstacles
+    if (this.wallSystem) {
+      const walls = this.wallSystem.getWalls();
+      walls.forEach(wall => {
+        const transform = wall.getComponent('Transform');
+        obstacles.push({
+          x: transform.x,
+          y: transform.y,
+          width: wall.width,
+          height: wall.height
+        });
+      });
+    }
+    
+    // Add consoles as obstacles
+    this.consoles.forEach(console => {
+      const transform = console.getComponent('Transform');
+      obstacles.push({
+        x: transform.x - 30, // Console collision area
+        y: transform.y - 20,
+        width: 60,
+        height: 40
+      });
+    });
+    
+    // Add other guests as temporary obstacles (to avoid clustering)
+    this.guests.forEach(guest => {
+      const transform = guest.getComponent('Transform');
+      obstacles.push({
+        x: transform.x - 15,
+        y: transform.y - 15,
+        width: 30,
+        height: 30
+      });
+    });
+    
+    this.pathfinding.updateObstacles(obstacles);
+  }
+
+  /**
+   * Update guest spawning with difficulty scaling
    * @private
    */
   updateGuestSpawning() {
     const currentTime = Date.now();
-    if (currentTime - this.lastGuestSpawn > this.guestSpawnInterval) {
+    const spawnInterval = this.difficultyScalingSystem.getGuestSpawnInterval();
+    
+    if (currentTime - this.lastGuestSpawn > spawnInterval && 
+        this.difficultyScalingSystem.canSpawnMoreGuests()) {
       this.spawnGuest();
       this.lastGuestSpawn = currentTime;
     }
@@ -564,26 +750,47 @@ class PowerUpGame {
   updateGuestAI() {
     this.guests.forEach(guest => {
       if (guest.state === 'seeking') {
-        const nearestConsole = guest.findNearestConsole(this.consoles);
+        // Check if there are any immediately available consoles
+        const availableConsole = this.findImmediatelyAvailableConsole(guest);
         
-        if (nearestConsole) {
+        if (availableConsole) {
           const guestTransform = guest.getComponent('Transform');
-          const consoleTransform = nearestConsole.getComponent('Transform');
+          const consoleTransform = availableConsole.getComponent('Transform');
           const distance = guestTransform.distanceTo(consoleTransform);
           
           if (distance < 60) {
             try {
-              guest.startUsingConsole(nearestConsole);
-              console.debug(`Guest started using ${nearestConsole.type} console`);
+              guest.startUsingConsole(availableConsole);
+              console.debug(`Guest started using ${availableConsole.type} console directly`);
             } catch (error) {
-              guest.moveToConsole(nearestConsole);
+              guest.moveToConsole(availableConsole);
             }
           } else {
-            guest.moveToConsole(nearestConsole);
+            guest.moveToConsole(availableConsole);
           }
         }
+        // If no immediately available console, queue manager will handle queue joining
       }
     });
+  }
+
+  /**
+   * Find an immediately available console for a guest (no queue needed)
+   * @param {Guest} guest - Guest looking for console
+   * @returns {GameConsole|null} Available console or null
+   * @private
+   */
+  findImmediatelyAvailableConsole(guest) {
+    const availableConsoles = this.consoles.filter(console => 
+      console.isOperational() && 
+      !console.isInUse() && 
+      console.getQueueLength() === 0
+    );
+    
+    if (availableConsoles.length === 0) return null;
+    
+    // Use strategic placement to find best available console
+    return this.placementSystem.findOptimalConsole(guest, availableConsoles);
   }
 
   /**
@@ -711,6 +918,24 @@ class PowerUpGame {
   }
 
   /**
+   * Spawn a test power-up near the character (for testing)
+   * @private
+   */
+  spawnTestPowerUp() {
+    if (!this.character) return;
+    
+    const characterPos = this.character.getPosition();
+    const offsetX = (Math.random() - 0.5) * 200;
+    const offsetY = (Math.random() - 0.5) * 200;
+    
+    this.powerUpManager.spawnPowerUp(
+      'speed-boost',
+      characterPos.x + offsetX,
+      characterPos.y + offsetY
+    );
+  }
+
+  /**
    * Handle repair interaction when SPACE is pressed
    */
   handleRepairInteraction() {
@@ -732,18 +957,41 @@ class PowerUpGame {
     });
     
     if (brokenConsole) {
-      brokenConsole.startRepair();
+      // Apply character repair multiplier (from power-ups) and repair speed bonus (from upgrades)
+      const powerUpMultiplier = this.character.repairMultiplier || 1.0;
+      const upgradeMultiplier = this.character.baseRepairSpeedBonus || 1.0;
+      const totalMultiplier = powerUpMultiplier * upgradeMultiplier;
+      
+      brokenConsole.startRepair(totalMultiplier);
       this.audioSystem.playRepairSound();
       
-      // Create floating repair notification
+      // Create floating repair notification (different for boosted repairs)
       const consoleTransform = brokenConsole.getComponent('Transform');
-      this.createFloatingNumber(
-        consoleTransform.x, 
-        consoleTransform.y - 30, 
-        'REPAIRING...', 
-        '#FFFF00',
-        3000
-      );
+      if (totalMultiplier > 5.0) {
+        this.createFloatingNumber(
+          consoleTransform.x, 
+          consoleTransform.y - 30, 
+          'ULTRA REPAIR!', 
+          '#FF00FF',
+          2000
+        );
+      } else if (totalMultiplier > 1.5) {
+        this.createFloatingNumber(
+          consoleTransform.x, 
+          consoleTransform.y - 30, 
+          'FAST REPAIR!', 
+          '#FFD700',
+          2000
+        );
+      } else {
+        this.createFloatingNumber(
+          consoleTransform.x, 
+          consoleTransform.y - 30, 
+          'REPAIRING...', 
+          '#FFFF00',
+          3000
+        );
+      }
     }
   }
 
@@ -755,10 +1003,22 @@ class PowerUpGame {
       // Clear canvas
       this.renderSystem.clear();
 
+      // Layer 0: Walls (background) - render first, before grid
+      if (this.wallSystem.wallsVisible) {
+        this.wallSystem.walls.forEach(wall => {
+          try {
+            wall.render(this.renderSystem);
+          } catch (error) {
+            console.error('Error rendering wall:', error, wall);
+          }
+        });
+      }
+
       // Draw background grid
       this.drawGrid();
 
       // Render entities in layers (background to foreground)
+      
       // Layer 1: Consoles (background)
       this.consoles.forEach(console => {
         try {
@@ -768,7 +1028,16 @@ class PowerUpGame {
         }
       });
       
-      // Layer 2: Character and Guests (foreground)
+      // Layer 2: Power-ups (mid-ground)
+      this.powerUps.forEach(powerUp => {
+        try {
+          powerUp.render(this.renderSystem);
+        } catch (error) {
+          console.error('Error rendering power-up:', error, powerUp);
+        }
+      });
+      
+      // Layer 3: Character and Guests (foreground)
       if (this.character) {
         try {
           this.character.render(this.renderSystem);
@@ -785,7 +1054,7 @@ class PowerUpGame {
         }
       });
       
-      // Layer 3: Floating numbers (top layer)
+      // Layer 4: Floating numbers (top layer)
       this.floatingNumbers.forEach(floatingNumber => {
         try {
           floatingNumber.render(this.renderSystem);
@@ -807,6 +1076,15 @@ class PowerUpGame {
     if (this.tutorialSystem.isActive) {
       this.tutorialSystem.render(this.renderSystem);
     }
+
+    // Render character upgrade menu (if visible)
+    this.characterUpgradeSystem.render(this.renderSystem);
+
+    // Render achievement system (notifications and menu)  
+    this.achievementSystem.render(this.renderSystem);
+    
+    // Render console unlock notifications
+    this.consoleUnlockSystem.render(this.renderSystem);
 
     // Draw UI
     this.renderUI();
@@ -931,10 +1209,13 @@ class PowerUpGame {
    * @private
    */
   renderUI() {
+    // Removed playable area border - walls provide sufficient boundary indication
+    
     // Control instructions
     const uiLines = [
-      'WASD: Move | SPACE: Repair | 1-4: Buy Consoles | B: Break Console (test)',
-      'ENTER: Confirm Purchase | ESC: Cancel | Tutorial: Available on first play'
+      'WASD: Move | SPACE: Repair | 1-4: Buy Consoles | U: Upgrades | A: Achievements',
+      'ENTER: Confirm Purchase | ESC: Cancel | P: Spawn Power-up (test) | B: Break Console (test)',
+      'Y: Unlock All Consoles (test) | O: Unlock Next Console (test) | D: Show Difficulty (test) | N: Next Day Difficulty (test) | W: Wall Info (test) | V: Toggle Walls'
     ];
     
     if (this.purchaseSystem.placementMode) {
@@ -1112,10 +1393,12 @@ window.resetGame = function() {
     // Restart game after a brief delay
     setTimeout(() => {
       try {
+        console.log('Attempting to create new game after reset...');
         window.game = new PowerUpGame();
         console.log('Game reset successfully');
       } catch (error) {
         console.error('Failed to restart game after reset:', error);
+        console.error('Reset error stack:', error.stack);
         showErrorMessage('Failed to restart game after reset. Please reload the page.');
       }
     }, 500);
@@ -1151,10 +1434,13 @@ function showErrorMessage(message) {
 // Start the game when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
   try {
+    console.log('Starting game initialization...');
     // Expose game instance to window for testing and debugging
     window.game = new PowerUpGame();
+    console.log('Game initialized successfully');
   } catch (error) {
     console.error('Failed to initialize game:', error);
+    console.error('Error stack:', error.stack);
     showErrorMessage('Game failed to initialize. This might be due to corrupted save data.');
   }
 });

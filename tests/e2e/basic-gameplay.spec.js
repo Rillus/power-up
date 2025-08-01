@@ -2,11 +2,28 @@ import { test, expect } from '@playwright/test';
 
 test.describe('Basic Gameplay', () => {
   test.beforeEach(async ({ page }) => {
+    // Listen to console logs to debug initialization issues
+    page.on('console', msg => {
+      if (msg.type() === 'error') {
+        console.error('Page error:', msg.text());
+      } else {
+        console.log('Page log:', msg.text());
+      }
+    });
+    
     await page.goto('/');
     await page.waitForSelector('#game-canvas');
     
+    // Check if there's an error message and reset if needed
+    const errorMessage = await page.locator('#error-message').isVisible();
+    if (errorMessage) {
+      console.log('Error message detected, clicking reset button');
+      await page.click('#reset-button');
+      await page.waitForTimeout(2000); // Wait longer for reset to complete
+    }
+    
     // Wait for game to initialize
-    await page.waitForFunction(() => window.game !== undefined);
+    await page.waitForFunction(() => window.game !== undefined, { timeout: 15000 });
   });
 
   test('should load game and show initial UI', async ({ page }) => {

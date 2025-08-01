@@ -30,15 +30,21 @@ export class Character extends Entity {
     this.color = this.validateColor(customization.color) || '#0066CC';
     this.customization = { ...customization };
     
+    // Power-up effects
+    this.speedMultiplier = 1.0;
+    this.repairMultiplier = 1.0;
+    this.hasSpeedBoost = false;
+    this.hasRepairBoost = false;
+    
     // Debug mode for showing additional info
     this.debugMode = false;
     
-    // Collision boundaries
+    // Collision boundaries (will be updated by game when wall system is available)
     this.boundaries = {
       left: 20,
-      right: 780,
+      right: 1180, // 1200 - 20
       top: 20,
-      bottom: 580
+      bottom: 780  // 800 - 20
     };
   }
 
@@ -117,6 +123,19 @@ export class Character extends Entity {
   getPosition() {
     const transform = this.getComponent('Transform');
     return { x: transform.x, y: transform.y };
+  }
+
+  /**
+   * Update boundaries from wall system
+   * @param {Object} playableArea - Playable area bounds from wall system
+   */
+  updateBoundaries(playableArea) {
+    this.boundaries = {
+      left: playableArea.left + this.radius,
+      right: playableArea.right - this.radius,
+      top: playableArea.top + this.radius,
+      bottom: playableArea.bottom - this.radius
+    };
   }
 
   /**
@@ -271,12 +290,76 @@ export class Character extends Entity {
   render(renderer) {
     const transform = this.getComponent('Transform');
     
+    // Draw power-up effect auras
+    if (this.hasSpeedBoost) {
+      // Speed boost - green glowing effect
+      renderer.drawCircle(
+        transform.x,
+        transform.y,
+        this.radius + 8,
+        '#00FF00',
+        false,
+        0.3 // 30% opacity
+      );
+      
+      // Animated speed lines
+      const time = Date.now() * 0.01;
+      for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2 + time;
+        const lineX = transform.x + Math.cos(angle) * (this.radius + 12);
+        const lineY = transform.y + Math.sin(angle) * (this.radius + 12);
+        const endX = lineX + Math.cos(angle) * 8;
+        const endY = lineY + Math.sin(angle) * 8;
+        
+        renderer.drawLine(lineX, lineY, endX, endY, '#00FF00', 2);
+      }
+    }
+    
+    if (this.hasRepairBoost) {
+      // Repair boost - gold glowing effect
+      renderer.drawCircle(
+        transform.x,
+        transform.y,
+        this.radius + 6,
+        '#FFD700',
+        false,
+        0.4 // 40% opacity
+      );
+      
+      // Tool icons around character
+      const tools = ['🔧', '⚙️', '🔨'];
+      const time = Date.now() * 0.005;
+      for (let i = 0; i < tools.length; i++) {
+        const angle = (i / tools.length) * Math.PI * 2 + time;
+        const iconX = transform.x + Math.cos(angle) * (this.radius + 20);
+        const iconY = transform.y + Math.sin(angle) * (this.radius + 20);
+        
+        renderer.drawText(
+          tools[i],
+          iconX,
+          iconY,
+          {
+            font: '12px Arial',
+            color: '#FFD700',
+            align: 'center'
+          }
+        );
+      }
+    }
+    
     // Draw character as circle
+    let characterColor = this.color;
+    if (this.hasSpeedBoost) {
+      characterColor = '#66FF66'; // Tinted green during speed boost
+    } else if (this.hasRepairBoost) {
+      characterColor = '#FFFF66'; // Tinted yellow during repair boost
+    }
+    
     renderer.drawCircle(
       transform.x,
       transform.y,
       this.radius,
-      this.color
+      characterColor
     );
     
     // Draw character name in debug mode

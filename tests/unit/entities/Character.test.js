@@ -140,9 +140,9 @@ describe('Character', () => {
       expect(transform.x).toBe(20); // Minimum boundary
       expect(transform.y).toBe(20);
 
-      character.setPosition(900, 700);
-      expect(transform.x).toBe(780); // Maximum boundary
-      expect(transform.y).toBe(580);
+      character.setPosition(1500, 1000);
+      expect(transform.x).toBe(1180); // Maximum boundary
+      expect(transform.y).toBe(780); // Maximum boundary
     });
   });
 

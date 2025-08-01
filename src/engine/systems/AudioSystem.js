@@ -215,6 +215,17 @@ export class AudioSystem {
     setTimeout(() => this.playTone(1000, 300, 0.4), 300);
   }
 
+  /**
+   * Play power-up collection sound
+   */
+  playPowerUpSound() {
+    // Ascending chime for power-up collection
+    this.playTone(800, 100, 0.3, 'sine');
+    setTimeout(() => this.playTone(1000, 100, 0.3, 'sine'), 80);
+    setTimeout(() => this.playTone(1200, 100, 0.3, 'sine'), 160);
+    setTimeout(() => this.playTone(1600, 200, 0.4, 'sine'), 240);
+  }
+
   // Music System
 
   /**

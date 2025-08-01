@@ -10,12 +10,36 @@ export class ConsolePurchaseSystem {
   constructor(game) {
     this.game = game;
     
-    // Console types and their costs
+    // Console types and their costs - sync with GameConsole.js
     this.consoleTypes = {
-      'retro-arcade': { cost: 500, name: 'Retro Arcade' },
-      'classic-home': { cost: 1200, name: 'Classic Home' },
-      'modern-gaming': { cost: 2500, name: 'Modern Gaming' },
-      'vr-experience': { cost: 5000, name: 'VR Experience' }
+      'retro-arcade': { 
+        cost: 500, 
+        name: 'Retro Arcade',
+        description: 'Basic console - appeals to casual guests',
+        revenue: '£2/use',
+        capacity: '1 guest'
+      },
+      'classic-home': { 
+        cost: 1200, 
+        name: 'Classic Home',
+        description: 'Mid-tier console - appeals to families, serves 2 guests',
+        revenue: '£4/use + £1 bonus',
+        capacity: '2 guests'
+      },
+      'modern-gaming': { 
+        cost: 2500, 
+        name: 'Modern Gaming',
+        description: 'High-tier console - appeals to enthusiasts',
+        revenue: '£6/use + £2 bonus',
+        capacity: '2 guests'
+      },
+      'vr-experience': { 
+        cost: 5000, 
+        name: 'VR Experience',
+        description: 'Premium console - maximum appeal to enthusiasts',
+        revenue: '£10/use + £4 bonus',
+        capacity: '1 guest'
+      }
     };
     
     // Placement state
@@ -45,11 +69,37 @@ export class ConsolePurchaseSystem {
   }
 
   /**
-   * Get list of console types player can afford
-   * @returns {string[]} Array of affordable console types
+   * Get list of console types player can afford and are unlocked
+   * @returns {string[]} Array of affordable and unlocked console types
    */
   getAffordableConsoles() {
-    return Object.keys(this.consoleTypes).filter(type => this.canAfford(type));
+    return Object.keys(this.consoleTypes).filter(type => {
+      return this.canAfford(type) && this.isConsoleUnlocked(type);
+    });
+  }
+
+  /**
+   * Check if a console type is unlocked
+   * @param {string} consoleType - Console type to check
+   * @returns {boolean} True if unlocked or no unlock system present
+   */
+  isConsoleUnlocked(consoleType) {
+    if (this.game.consoleUnlockSystem) {
+      return this.game.consoleUnlockSystem.isConsoleUnlocked(consoleType);
+    }
+    // If no unlock system, allow all consoles (backward compatibility)
+    return true;
+  }
+  
+  /**
+   * Update available consoles (called when unlocks change)
+   */
+  updateAvailableConsoles() {
+    // This method can be used by other systems to trigger UI updates
+    // when console availability changes
+    this.emit('availableConsolesChanged', {
+      availableConsoles: this.getAffordableConsoles()
+    });
   }
 
   /**
@@ -95,12 +145,19 @@ export class ConsolePurchaseSystem {
    * @returns {boolean} True if position is valid
    */
   isValidPlacement(x, y) {
-    // Check canvas boundaries
-    if (x < this.edgeMargin || 
-        x > 1200 - this.edgeMargin || 
-        y < this.edgeMargin || 
-        y > 800 - this.edgeMargin) {
-      return false;
+    // Check boundaries using wall system if available
+    if (this.game.wallSystem) {
+      if (!this.game.wallSystem.isRectangleWithinPlayableArea(x - 30, y - 20, 60, 40, this.edgeMargin)) {
+        return false;
+      }
+    } else {
+      // Fallback to canvas boundaries
+      if (x < this.edgeMargin || 
+          x > 1200 - this.edgeMargin || 
+          y < this.edgeMargin || 
+          y > 800 - this.edgeMargin) {
+        return false;
+      }
     }
     
     // Check distance from existing consoles
@@ -115,6 +172,17 @@ export class ConsolePurchaseSystem {
     }
     
     return true;
+  }
+
+  /**
+   * Get strategic placement analysis for a position
+   * @param {number} x - X position to analyze
+   * @param {number} y - Y position to analyze
+   * @returns {Object|null} Strategic analysis or null if no placement system
+   */
+  getStrategicAnalysis(x, y) {
+    if (!this.game.placementSystem) return null;
+    return this.game.placementSystem.analyzePosition(x, y);
   }
 
   /**
@@ -184,6 +252,9 @@ export class ConsolePurchaseSystem {
       type,
       name: info.name,
       cost: info.cost,
+      description: info.description,
+      revenue: info.revenue,
+      capacity: info.capacity,
       affordable: this.canAfford(type)
     }));
   }
@@ -195,11 +266,15 @@ export class ConsolePurchaseSystem {
   getPreviewData() {
     if (!this.placementMode) return null;
     
+    const isValid = this.isValidPlacement(this.previewPosition.x, this.previewPosition.y);
+    const strategicAnalysis = this.getStrategicAnalysis(this.previewPosition.x, this.previewPosition.y);
+    
     return {
       x: this.previewPosition.x,
       y: this.previewPosition.y,
       type: this.selectedConsoleType,
-      valid: this.isValidPlacement(this.previewPosition.x, this.previewPosition.y)
+      valid: isValid,
+      strategic: strategicAnalysis
     };
   }
 
