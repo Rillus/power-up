@@ -1,6 +1,8 @@
 import { RenderSystem } from './engine/systems/RenderSystem.js';
 import { InputSystem } from './engine/systems/InputSystem.js';
 import { AudioSystem } from './engine/systems/AudioSystem.js';
+import { CameraSystem } from './engine/systems/CameraSystem.js';
+import { AnalyticsSystem } from './engine/systems/AnalyticsSystem.js';
 import { Character } from './entities/Character.js';
 import { GameConsole } from './entities/GameConsole.js';
 import { Guest } from './entities/Guest.js';
@@ -36,6 +38,21 @@ class PowerUpGame {
     this.inputSystem = new InputSystem(document);
     this.audioSystem = new AudioSystem();
     this.saveSystem = new SaveSystem();
+    this.cameraSystem = new CameraSystem(this.canvas.width, this.canvas.height, {
+      followSpeed: 0.08, // Slightly slower for more dynamism
+      lookAheadDistance: 60,
+      maxLookAhead: 120,
+      enabled: true
+    });
+    this.analyticsSystem = new AnalyticsSystem({
+      enabled: true,
+      onEvent: (event) => {
+        // Log important events in browser environment
+        if (typeof window !== 'undefined' && typeof console !== 'undefined' && ['session_start', 'session_end', 'game_over'].includes(event.eventName)) {
+          console.log('Analytics:', event.eventName, event.data);
+        }
+      }
+    });
     
     // Initialize game systems
     this.gameStateManager = new GameStateManager(this.saveSystem, this.audioSystem);
@@ -58,6 +75,17 @@ class PowerUpGame {
     this.difficultyScalingSystem = new DifficultyScalingSystem(this, this.gameStateManager);
     this.wallSystem = new WallSystem(this);
     this.pathfinding = new Pathfinding(40); // 40px grid for pathfinding
+    
+    // Set camera world bounds based on wall system
+    if (this.wallSystem) {
+      const playableArea = this.wallSystem.getPlayableArea();
+      this.cameraSystem.setWorldBounds({
+        left: 0,
+        right: this.canvas.width,
+        top: 0,
+        bottom: this.canvas.height
+      });
+    }
     this.tutorialSystem = new TutorialSystem(this.saveSystem);
     
     // Game timing
@@ -95,6 +123,13 @@ class PowerUpGame {
     this.gameStateManager.on('angryGuest', (data) => {
       this.audioSystem.playWarningSound();
       
+      // Track angry guest
+      this.analyticsSystem.trackAngryGuest({
+        angryGuestCount: data.count,
+        angryGuestLimit: data.limit,
+        day: this.gameStateManager.gameData.day
+      });
+      
       // Update UI counter
       this.updateUI();
       
@@ -109,6 +144,15 @@ class PowerUpGame {
     });
     
     this.gameStateManager.on('gameOver', (data) => {
+      // Track game over
+      this.analyticsSystem.trackEvent('game_over', {
+        reason: data.reason,
+        day: this.gameStateManager.gameData.day,
+        money: this.money,
+        angryGuests: this.angryGuests,
+        totalPlayTime: this.analyticsSystem.totalPlayTime
+      });
+      
       this.handleGameOver(data);
     });
     
@@ -116,6 +160,14 @@ class PowerUpGame {
     this.purchaseSystem.on('purchaseComplete', (data) => {
       this.gameStateManager.spendMoney(data.cost);
       this.audioSystem.playClickSound();
+      
+      // Track console purchase
+      this.analyticsSystem.trackAction('consolePurchases', {
+        consoleType: data.type,
+        cost: data.cost,
+        position: { x: data.x, y: data.y },
+        moneyAfterPurchase: this.money - data.cost
+      });
       
       // Create the console entity
       this.createConsole(data.x, data.y, data.type);
@@ -269,6 +321,12 @@ class PowerUpGame {
       );
       
       this.audioSystem.playRepairSound();
+      
+      // Track repair action
+      this.analyticsSystem.trackAction('repairs', {
+        consoleType: console.type,
+        consolePosition: { x: data.x, y: data.y }
+      });
       
       // Update repair achievement
       if (this.achievementSystem) {
@@ -451,6 +509,13 @@ class PowerUpGame {
     this.running = true;
     this.lastGuestSpawn = Date.now();
     this.updateUI();
+    
+    // Track session start
+    this.analyticsSystem.trackSessionStart({
+      gameState: 'playing',
+      money: this.money,
+      day: this.gameStateManager.gameData.day
+    });
   }
 
   /**
@@ -588,6 +653,26 @@ class PowerUpGame {
     this.entities.forEach(entity => {
       entity.update(deltaTime);
     });
+    
+    // Update camera to follow character
+    if (this.character) {
+      const characterPos = this.character.getPosition();
+      const movement = this.character.getComponent('Movement');
+      const velocity = movement ? { x: movement.velocityX, y: movement.velocityY } : { x: 0, y: 0 };
+      this.cameraSystem.setTarget(characterPos.x, characterPos.y, velocity);
+    }
+    
+    // Update camera system
+    this.cameraSystem.update(deltaTime);
+    
+    // Update analytics system
+    this.analyticsSystem.update(deltaTime);
+    
+    // Track performance metrics every 60 frames
+    if (this.frameCount % 60 === 0) {
+      const fps = 1000 / deltaTime;
+      this.analyticsSystem.trackPerformance({ fps, deltaTime });
+    }
     
     // Update input system to clear just pressed/released states
     this.inputSystem.update();
@@ -875,6 +960,9 @@ class PowerUpGame {
           '#FF0000',
           1500
         );
+        
+        // Add screen shake for dramatic effect
+        this.cameraSystem.addShake(15, 0.9);
       }
     }
     
@@ -893,6 +981,9 @@ class PowerUpGame {
           '#FF0000',
           1500
         );
+        
+        // Add screen shake for dramatic effect
+        this.cameraSystem.addShake(15, 0.9);
       }
     }
   }
@@ -1002,6 +1093,10 @@ class PowerUpGame {
     try {
       // Clear canvas
       this.renderSystem.clear();
+      
+      // Apply camera transform
+      const cameraTransform = this.cameraSystem.getTransform();
+      this.renderSystem.setTransform(cameraTransform);
 
       // Layer 0: Walls (background) - render first, before grid
       if (this.wallSystem.wallsVisible) {
@@ -1086,6 +1181,9 @@ class PowerUpGame {
     // Render console unlock notifications
     this.consoleUnlockSystem.render(this.renderSystem);
 
+    // Reset transform for UI elements (UI should not be affected by camera)
+    this.renderSystem.resetTransform();
+    
     // Draw UI
     this.renderUI();
   }
