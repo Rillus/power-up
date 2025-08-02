@@ -1,0 +1,587 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Power Up Sprite Generator</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 20px; }
+        canvas { border: 1px solid #ccc; margin: 10px; }
+        .sprite-section { margin: 20px 0; }
+        .download-btn { 
+            background: #0066CC; color: white; border: none; 
+            padding: 5px 10px; margin: 5px; cursor: pointer;
+        }
+    </style>
+</head>
+<body>
+    <h1>Power Up Sprite Generator</h1>
+    
+    <div class="sprite-section">
+        <h2>Character Sprites (32x48px)</h2>
+        <h3>Idle Poses</h3>
+        <canvas id="volunteer_idle_down" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_idle_down')">Idle Down</button>
+        
+        <canvas id="volunteer_idle_up" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_idle_up')">Idle Up</button>
+        
+        <canvas id="volunteer_idle_left" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_idle_left')">Idle Left</button>
+        
+        <canvas id="volunteer_idle_right" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_idle_right')">Idle Right</button>
+
+        <h3>Walking Animation</h3>
+        <canvas id="volunteer_walk_down_01" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_walk_down_01')">Walk Down 1</button>
+        
+        <canvas id="volunteer_walk_down_02" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_walk_down_02')">Walk Down 2</button>
+        
+        <canvas id="volunteer_walk_up_01" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_walk_up_01')">Walk Up 1</button>
+        
+        <canvas id="volunteer_walk_up_02" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_walk_up_02')">Walk Up 2</button>
+        
+        <canvas id="volunteer_walk_left_01" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_walk_left_01')">Walk Left 1</button>
+        
+        <canvas id="volunteer_walk_left_02" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_walk_left_02')">Walk Left 2</button>
+        
+        <canvas id="volunteer_walk_right_01" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_walk_right_01')">Walk Right 1</button>
+        
+        <canvas id="volunteer_walk_right_02" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_walk_right_02')">Walk Right 2</button>
+
+        <h3>Special Actions</h3>
+        <canvas id="volunteer_repair" width="32" height="48"></canvas>
+        <button class="download-btn" onclick="downloadSprite('volunteer_repair')">Repair</button>
+    </div>
+
+    <div class="sprite-section">
+        <h2>Console Sprites (64x64px)</h2>
+        
+        <!-- Retro Arcade -->
+        <h3>Retro Arcade</h3>
+        <canvas id="retro_arcade_tier1" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('retro_arcade_tier1')">Download Retro T1</button>
+        <canvas id="retro_arcade_tier1_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('retro_arcade_tier1_broken')">Download Retro T1 Broken</button>
+        
+        <canvas id="retro_arcade_tier2" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('retro_arcade_tier2')">Download Retro T2</button>
+        <canvas id="retro_arcade_tier2_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('retro_arcade_tier2_broken')">Download Retro T2 Broken</button>
+        
+        <canvas id="retro_arcade_tier3" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('retro_arcade_tier3')">Download Retro T3</button>
+        <canvas id="retro_arcade_tier3_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('retro_arcade_tier3_broken')">Download Retro T3 Broken</button>
+        
+        <!-- Classic Home -->
+        <h3>Classic Home</h3>
+        <canvas id="classic_home_tier1" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('classic_home_tier1')">Download Classic T1</button>
+        <canvas id="classic_home_tier1_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('classic_home_tier1_broken')">Download Classic T1 Broken</button>
+        
+        <canvas id="classic_home_tier2" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('classic_home_tier2')">Download Classic T2</button>
+        <canvas id="classic_home_tier2_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('classic_home_tier2_broken')">Download Classic T2 Broken</button>
+        
+        <canvas id="classic_home_tier3" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('classic_home_tier3')">Download Classic T3</button>
+        <canvas id="classic_home_tier3_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('classic_home_tier3_broken')">Download Classic T3 Broken</button>
+        
+        <!-- Modern Gaming -->
+        <h3>Modern Gaming</h3>
+        <canvas id="modern_gaming_tier1" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('modern_gaming_tier1')">Download Modern T1</button>
+        <canvas id="modern_gaming_tier1_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('modern_gaming_tier1_broken')">Download Modern T1 Broken</button>
+        
+        <canvas id="modern_gaming_tier2" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('modern_gaming_tier2')">Download Modern T2</button>
+        <canvas id="modern_gaming_tier2_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('modern_gaming_tier2_broken')">Download Modern T2 Broken</button>
+        
+        <canvas id="modern_gaming_tier3" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('modern_gaming_tier3')">Download Modern T3</button>
+        <canvas id="modern_gaming_tier3_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('modern_gaming_tier3_broken')">Download Modern T3 Broken</button>
+        
+        <!-- VR Experience -->
+        <h3>VR Experience</h3>
+        <canvas id="vr_experience_tier1" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('vr_experience_tier1')">Download VR T1</button>
+        <canvas id="vr_experience_tier1_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('vr_experience_tier1_broken')">Download VR T1 Broken</button>
+        
+        <canvas id="vr_experience_tier2" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('vr_experience_tier2')">Download VR T2</button>
+        <canvas id="vr_experience_tier2_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('vr_experience_tier2_broken')">Download VR T2 Broken</button>
+        
+        <canvas id="vr_experience_tier3" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('vr_experience_tier3')">Download VR T3</button>
+        <canvas id="vr_experience_tier3_broken" width="64" height="64"></canvas>
+        <button class="download-btn" onclick="downloadSprite('vr_experience_tier3_broken')">Download VR T3 Broken</button>
+    </div>
+
+    <div class="sprite-section">
+        <h2>Guest Sprites (24x32px)</h2>
+        <canvas id="casual_family_01" width="24" height="32"></canvas>
+        <button class="download-btn" onclick="downloadSprite('casual_family_01')">Download Family</button>
+        
+        <canvas id="enthusiast_gamer" width="24" height="32"></canvas>
+        <button class="download-btn" onclick="downloadSprite('enthusiast_gamer')">Download Gamer</button>
+        
+        <canvas id="school_group" width="24" height="32"></canvas>
+        <button class="download-btn" onclick="downloadSprite('school_group')">Download School</button>
+    </div>
+
+    <script>
+        const colors = {
+            primary: '#0066CC',
+            white: '#FFFFFF',
+            lightGray: '#F5F5F5',
+            darkGray: '#333333',
+            green: '#00AA44',
+            red: '#CC0000'
+        };
+
+        function drawCharacterSprite(ctx, spriteType) {
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, w, h);
+            
+            // Parse sprite type (e.g., "idle_down", "walk_up_01")
+            const parts = spriteType.split('_');
+            const action = parts[0]; // idle, walk, repair
+            const direction = parts[1]; // down, up, left, right
+            const frame = parts[2]; // 01, 02 (for walk)
+            
+            // Draw character body
+            ctx.fillStyle = colors.primary;
+            
+            // Body position and orientation based on direction
+            if (direction === 'down' || direction === 'up') {
+                ctx.fillRect(8, 20, 16, 25); // front/back view
+            } else {
+                ctx.fillRect(8, 20, 16, 25); // side view
+            }
+            
+            // Draw head
+            ctx.beginPath();
+            ctx.arc(16, 12, 6, 0, 2 * Math.PI);
+            ctx.fillStyle = '#FFDBAC'; // skin color
+            ctx.fill();
+            
+            // Draw face based on direction
+            ctx.fillStyle = colors.darkGray;
+            if (direction === 'down') {
+                // Eyes facing down
+                ctx.fillRect(13, 10, 2, 1);
+                ctx.fillRect(17, 10, 2, 1);
+            } else if (direction === 'up') {
+                // Back of head, minimal features
+                ctx.fillStyle = '#E6B800'; // hair color
+                ctx.fillRect(12, 8, 8, 3);
+            } else if (direction === 'left') {
+                // Profile facing left
+                ctx.fillRect(12, 10, 1, 1); // eye
+                ctx.fillRect(11, 12, 2, 1); // nose
+            } else if (direction === 'right') {
+                // Profile facing right
+                ctx.fillRect(19, 10, 1, 1); // eye
+                ctx.fillRect(19, 12, 2, 1); // nose
+            }
+            
+            // Draw uniform details
+            ctx.fillStyle = colors.white;
+            ctx.fillRect(10, 22, 12, 2); // collar
+            
+            // Handle different actions
+            if (action === 'walk') {
+                // Walking animation
+                ctx.fillStyle = colors.darkGray;
+                
+                if (direction === 'down' || direction === 'up') {
+                    if (frame === '01') {
+                        // Left leg forward
+                        ctx.fillRect(10, 45, 4, 3);
+                        ctx.fillRect(18, 42, 4, 6);
+                    } else {
+                        // Right leg forward
+                        ctx.fillRect(10, 42, 4, 6);
+                        ctx.fillRect(18, 45, 4, 3);
+                    }
+                } else if (direction === 'left') {
+                    if (frame === '01') {
+                        // Walking left - leg positions
+                        ctx.fillRect(8, 44, 4, 4);
+                        ctx.fillRect(16, 42, 4, 6);
+                    } else {
+                        ctx.fillRect(8, 42, 4, 6);
+                        ctx.fillRect(16, 44, 4, 4);
+                    }
+                } else if (direction === 'right') {
+                    if (frame === '01') {
+                        // Walking right - leg positions
+                        ctx.fillRect(12, 44, 4, 4);
+                        ctx.fillRect(20, 42, 4, 6);
+                    } else {
+                        ctx.fillRect(12, 42, 4, 6);
+                        ctx.fillRect(20, 44, 4, 4);
+                    }
+                }
+            } else if (action === 'repair') {
+                // Arms extended (direction-neutral)
+                ctx.fillStyle = colors.primary;
+                ctx.fillRect(4, 25, 6, 3); // left arm
+                ctx.fillRect(22, 25, 6, 3); // right arm
+                // Tool in hand
+                ctx.fillStyle = colors.red;
+                ctx.fillRect(24, 24, 2, 8);
+                
+                // Legs
+                ctx.fillStyle = colors.darkGray;
+                ctx.fillRect(10, 44, 4, 4);
+                ctx.fillRect(18, 44, 4, 4);
+            } else {
+                // Idle pose
+                ctx.fillStyle = colors.darkGray;
+                ctx.fillRect(10, 44, 4, 4); // left leg
+                ctx.fillRect(18, 44, 4, 4); // right leg
+            }
+        }
+
+        function drawConsoleSprite(ctx, type) {
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
+            const isBroken = type.includes('broken');
+            const tier = type.includes('tier3') ? 3 : type.includes('tier2') ? 2 : 1;
+            
+            ctx.clearRect(0, 0, w, h);
+            
+            // Base console shape - darker if broken, more refined for higher tiers
+            let baseColor = colors.darkGray;
+            if (isBroken) {
+                baseColor = '#1a1a1a';
+            } else if (tier === 3) {
+                baseColor = '#444444'; // Sleeker for tier 3
+            } else if (tier === 2) {
+                baseColor = '#3a3a3a'; // Medium for tier 2
+            }
+            ctx.fillStyle = baseColor;
+            ctx.fillRect(8, 20, 48, 35);
+            
+            // Screen - larger for higher tiers
+            ctx.fillStyle = '#000000';
+            if (tier === 3) {
+                ctx.fillRect(10, 22, 44, 29); // Larger screen
+            } else {
+                ctx.fillRect(12, 24, 40, 25); // Standard screen
+            }
+            
+            // Screen glow - red static if broken, blue if working
+            if (isBroken) {
+                ctx.fillStyle = '#330000'; // Dark red
+                if (tier === 3) {
+                    ctx.fillRect(12, 24, 40, 25);
+                } else {
+                    ctx.fillRect(14, 26, 36, 21);
+                }
+                // Static effect
+                ctx.fillStyle = colors.red;
+                for (let i = 0; i < 8; i++) {
+                    const x = 16 + Math.random() * 32;
+                    const y = 28 + Math.random() * 17;
+                    ctx.fillRect(x, y, 2, 2);
+                }
+            } else {
+                // Better screen quality for higher tiers
+                let screenColor = colors.primary;
+                if (tier === 3) {
+                    screenColor = '#00CCFF'; // Brighter blue for tier 3
+                    ctx.fillStyle = screenColor;
+                    ctx.fillRect(12, 24, 40, 25);
+                } else if (tier === 2) {
+                    screenColor = '#0088CC'; // Medium blue for tier 2
+                    ctx.fillStyle = screenColor;
+                    ctx.fillRect(14, 26, 36, 21);
+                } else {
+                    ctx.fillStyle = screenColor;
+                    ctx.fillRect(14, 26, 36, 21);
+                }
+            }
+            
+            // Tier indicators (LED strips for higher tiers)
+            if (!isBroken && tier > 1) {
+                ctx.fillStyle = tier === 3 ? '#00FF00' : '#FFFF00';
+                // LED strip
+                for (let i = 0; i < tier; i++) {
+                    ctx.fillRect(58 - i * 3, 20, 2, 2);
+                }
+            }
+            
+            // Type-specific details
+            if (type.includes('retro')) {
+                // Joystick
+                ctx.fillStyle = isBroken ? '#660000' : colors.red;
+                ctx.fillRect(30, 52, 4, 6);
+                ctx.fillStyle = isBroken ? colors.lightGray : colors.white;
+                ctx.beginPath();
+                ctx.arc(32, 54, 2, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Extra buttons for higher tiers
+                if (tier > 1 && !isBroken) {
+                    ctx.fillStyle = colors.green;
+                    ctx.beginPath();
+                    ctx.arc(38, 54, 1.5, 0, 2 * Math.PI);
+                    ctx.fill();
+                    if (tier === 3) {
+                        ctx.fillStyle = '#FFFF00';
+                        ctx.beginPath();
+                        ctx.arc(26, 54, 1.5, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                }
+            } else if (type.includes('classic')) {
+                // D-pad
+                ctx.fillStyle = isBroken ? '#2a2a2a' : colors.darkGray;
+                ctx.fillRect(20, 52, 8, 2);
+                ctx.fillRect(22, 50, 4, 6);
+                // Buttons
+                ctx.fillStyle = isBroken ? '#660000' : colors.red;
+                ctx.beginPath();
+                ctx.arc(38, 52, 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillStyle = isBroken ? '#003300' : colors.green;
+                ctx.beginPath();
+                ctx.arc(42, 55, 2, 0, 2 * Math.PI);
+                ctx.fill();
+                
+                // Extra buttons for higher tiers
+                if (tier > 1 && !isBroken) {
+                    ctx.fillStyle = '#FFFF00';
+                    ctx.beginPath();
+                    ctx.arc(34, 55, 1.5, 0, 2 * Math.PI);
+                    ctx.fill();
+                    if (tier === 3) {
+                        ctx.fillStyle = '#FF00FF';
+                        ctx.beginPath();
+                        ctx.arc(46, 52, 1.5, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                }
+            } else if (type.includes('modern')) {
+                // Sleek design
+                ctx.fillStyle = isBroken ? colors.lightGray : colors.white;
+                if (tier === 3) {
+                    ctx.fillRect(8, 20, 48, 35); // Full width for tier 3
+                } else {
+                    ctx.fillRect(10, 22, 44, 29);
+                }
+                ctx.fillStyle = '#000000';
+                if (tier === 3) {
+                    ctx.fillRect(10, 22, 44, 29);
+                } else {
+                    ctx.fillRect(12, 24, 40, 25);
+                }
+                
+                if (isBroken) {
+                    ctx.fillStyle = '#330000';
+                    ctx.fillRect(14, 26, 36, 21);
+                    // Static effect
+                    ctx.fillStyle = colors.red;
+                    for (let i = 0; i < 6; i++) {
+                        const x = 16 + Math.random() * 32;
+                        const y = 28 + Math.random() * 17;
+                        ctx.fillRect(x, y, 2, 2);
+                    }
+                } else {
+                    let screenColor = tier === 3 ? '#00CCFF' : tier === 2 ? '#0088CC' : colors.primary;
+                    ctx.fillStyle = screenColor;
+                    if (tier === 3) {
+                        ctx.fillRect(12, 24, 40, 25);
+                    } else {
+                        ctx.fillRect(14, 26, 36, 21);
+                    }
+                }
+            } else if (type.includes('vr')) {
+                // VR headset on stand
+                ctx.fillStyle = isBroken ? colors.lightGray : colors.white;
+                if (tier === 3) {
+                    ctx.fillRect(18, 13, 28, 16); // Larger headset for tier 3
+                } else {
+                    ctx.fillRect(20, 15, 24, 12);
+                }
+                
+                ctx.fillStyle = isBroken ? '#2a2a2a' : colors.darkGray;
+                if (tier === 3) {
+                    ctx.fillRect(20, 15, 24, 12);
+                } else {
+                    ctx.fillRect(22, 17, 20, 8);
+                }
+                
+                // Stand
+                ctx.fillStyle = colors.lightGray;
+                ctx.fillRect(30, 27, 4, 20);
+                ctx.fillRect(24, 47, 16, 4);
+                
+                // Extra sensors for higher tiers
+                if (tier > 1 && !isBroken) {
+                    ctx.fillStyle = colors.red;
+                    ctx.beginPath();
+                    ctx.arc(25, 19, 1, 0, 2 * Math.PI);
+                    ctx.fill();
+                    ctx.beginPath();
+                    ctx.arc(39, 19, 1, 0, 2 * Math.PI);
+                    ctx.fill();
+                    
+                    if (tier === 3) {
+                        ctx.beginPath();
+                        ctx.arc(32, 17, 1, 0, 2 * Math.PI);
+                        ctx.fill();
+                    }
+                }
+            }
+            
+            // Broken state indicators
+            if (isBroken) {
+                // Warning symbol (!)
+                ctx.fillStyle = colors.red;
+                ctx.fillRect(54, 12, 3, 8);
+                ctx.fillRect(54, 22, 3, 2);
+                
+                // Smoke/sparks effect
+                ctx.fillStyle = '#666666';
+                for (let i = 0; i < 3; i++) {
+                    const x = 50 + Math.random() * 8;
+                    const y = 8 + Math.random() * 6;
+                    ctx.beginPath();
+                    ctx.arc(x, y, 1, 0, 2 * Math.PI);
+                    ctx.fill();
+                }
+            }
+        }
+
+        function drawGuestSprite(ctx, type) {
+            const w = ctx.canvas.width;
+            const h = ctx.canvas.height;
+            
+            ctx.clearRect(0, 0, w, h);
+            
+            // Basic person shape
+            // Head
+            ctx.fillStyle = '#FFDBAC';
+            ctx.beginPath();
+            ctx.arc(12, 8, 4, 0, 2 * Math.PI);
+            ctx.fill();
+            
+            // Body
+            if (type.includes('family')) {
+                // Family - colorful casual clothes
+                ctx.fillStyle = colors.green;
+                ctx.fillRect(8, 12, 8, 12);
+                // Add child figure
+                ctx.fillStyle = '#FFDBAC';
+                ctx.beginPath();
+                ctx.arc(18, 20, 2, 0, 2 * Math.PI);
+                ctx.fill();
+                ctx.fillStyle = colors.red;
+                ctx.fillRect(16, 22, 4, 6);
+            } else if (type.includes('enthusiast')) {
+                // Gamer - darker clothes, gaming shirt
+                ctx.fillStyle = colors.darkGray;
+                ctx.fillRect(8, 12, 8, 12);
+                // Gaming logo
+                ctx.fillStyle = colors.primary;
+                ctx.fillRect(10, 14, 4, 2);
+            } else if (type.includes('school')) {
+                // School group - uniform
+                ctx.fillStyle = '#NAVY';
+                ctx.fillRect(8, 12, 8, 12);
+                ctx.fillStyle = colors.white;
+                ctx.fillRect(9, 13, 6, 2); // collar
+            }
+            
+            // Legs
+            ctx.fillStyle = '#000080';
+            ctx.fillRect(9, 24, 2, 6);
+            ctx.fillRect(13, 24, 2, 6);
+        }
+
+        function generateSprites() {
+            // Character sprites - all directional variants
+            const characterSprites = [
+                'volunteer_idle_down', 'volunteer_idle_up', 'volunteer_idle_left', 'volunteer_idle_right',
+                'volunteer_walk_down_01', 'volunteer_walk_down_02',
+                'volunteer_walk_up_01', 'volunteer_walk_up_02',
+                'volunteer_walk_left_01', 'volunteer_walk_left_02',
+                'volunteer_walk_right_01', 'volunteer_walk_right_02',
+                'volunteer_repair'
+            ];
+            
+            characterSprites.forEach(id => {
+                const canvas = document.getElementById(id);
+                if (canvas) {
+                    const ctx = canvas.getContext('2d');
+                    const type = id.replace('volunteer_', '');
+                    drawCharacterSprite(ctx, type);
+                }
+            });
+
+            // Console sprites - all tiers and broken states
+            const consoleTypes = ['retro_arcade', 'classic_home', 'modern_gaming', 'vr_experience'];
+            const tiers = ['tier1', 'tier2', 'tier3'];
+            
+            consoleTypes.forEach(type => {
+                tiers.forEach(tier => {
+                    // Normal console
+                    const normalId = `${type}_${tier}`;
+                    const normalCanvas = document.getElementById(normalId);
+                    if (normalCanvas) {
+                        const ctx = normalCanvas.getContext('2d');
+                        drawConsoleSprite(ctx, normalId);
+                    }
+                    
+                    // Broken console
+                    const brokenId = `${type}_${tier}_broken`;
+                    const brokenCanvas = document.getElementById(brokenId);
+                    if (brokenCanvas) {
+                        const ctx = brokenCanvas.getContext('2d');
+                        drawConsoleSprite(ctx, brokenId);
+                    }
+                });
+            });
+
+            // Guest sprites
+            ['casual_family_01', 'enthusiast_gamer', 'school_group'].forEach(id => {
+                const canvas = document.getElementById(id);
+                const ctx = canvas.getContext('2d');
+                drawGuestSprite(ctx, id);
+            });
+        }
+
+        function downloadSprite(canvasId) {
+            const canvas = document.getElementById(canvasId);
+            const link = document.createElement('a');
+            link.download = canvasId + '.png';
+            link.href = canvas.toDataURL();
+            link.click();
+        }
+
+        // Generate sprites on page load
+        window.onload = generateSprites;
+    </script>
+</body>
+</html>

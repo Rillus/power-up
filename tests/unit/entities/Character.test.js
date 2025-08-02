@@ -201,8 +201,8 @@ describe('Character', () => {
       expect(mockRenderer.drawText).toHaveBeenCalledWith(
         'Player',
         400,
-        285, // y position - 15 pixels above center
-        { color: '#FFFFFF', fontSize: 12, textAlign: 'center' }
+        270, // y position - 30 pixels above center (adjusted for sprite height)
+        { color: '#FFFFFF', font: '12px Arial', align: 'center' }
       );
     });
 

@@ -3,10 +3,12 @@ import { InputSystem } from './engine/systems/InputSystem.js';
 import { AudioSystem } from './engine/systems/AudioSystem.js';
 import { CameraSystem } from './engine/systems/CameraSystem.js';
 import { AnalyticsSystem } from './engine/systems/AnalyticsSystem.js';
+import { spriteLoader } from './utils/SpriteLoader.js';
 import { Character } from './entities/Character.js';
 import { GameConsole } from './entities/GameConsole.js';
 import { Guest } from './entities/Guest.js';
 import { FloatingNumber } from './entities/FloatingNumber.js';
+import { ParticleSystem } from './entities/Particle.js';
 import { ConsolePurchaseSystem } from './systems/ConsolePurchaseSystem.js';
 import { ConsoleUpgradeSystem } from './systems/ConsoleUpgradeSystem.js';
 import { StrategicPlacementSystem } from './systems/StrategicPlacementSystem.js';
@@ -20,6 +22,8 @@ import { WallSystem } from './systems/WallSystem.js';
 import { GameStateManager } from './systems/GameStateManager.js';
 import { SaveSystem } from './utils/SaveSystem.js';
 import { TutorialSystem } from './systems/TutorialSystem.js';
+import { StatisticsSystem } from './systems/StatisticsSystem.js';
+import { TouchControlSystem } from './systems/TouchControlSystem.js';
 import { Pathfinding } from './utils/Pathfinding.js';
 
 /**
@@ -34,7 +38,7 @@ class PowerUpGame {
     this.canvas = document.getElementById('game-canvas');
     
     // Initialize core systems
-    this.renderSystem = new RenderSystem(this.canvas);
+    this.renderSystem = new RenderSystem(this.canvas, spriteLoader);
     this.inputSystem = new InputSystem(document);
     this.audioSystem = new AudioSystem();
     this.saveSystem = new SaveSystem();
@@ -71,9 +75,12 @@ class PowerUpGame {
     this.guests = [];
     this.powerUps = [];
     this.floatingNumbers = [];
+    this.particleSystem = new ParticleSystem();
     
     this.difficultyScalingSystem = new DifficultyScalingSystem(this, this.gameStateManager);
     this.wallSystem = new WallSystem(this);
+    this.statisticsSystem = new StatisticsSystem(this, this.gameStateManager);
+    this.touchControlSystem = new TouchControlSystem(this.canvas, this.inputSystem);
     this.pathfinding = new Pathfinding(40); // 40px grid for pathfinding
     
     // Set camera world bounds based on wall system
@@ -98,7 +105,11 @@ class PowerUpGame {
     // Bind event handlers
     this.setupEventHandlers();
     
-    this.init();
+    // Initialize game with async sprite loading
+    this.init().catch(error => {
+      console.error('Game initialization failed:', error);
+      // Game will still work with fallback graphics
+    });
   }
 
   /**
@@ -320,6 +331,9 @@ class PowerUpGame {
         2000
       );
       
+      // Add repair particle effect
+      this.particleSystem.createRepairEffect(data.x, data.y);
+      
       this.audioSystem.playRepairSound();
       
       // Track repair action
@@ -386,7 +400,16 @@ class PowerUpGame {
   /**
    * Initialize the game
    */
-  init() {
+  async init() {
+    // Try to preload sprites (non-blocking)
+    try {
+      console.log('Preloading sprites...');
+      await spriteLoader.preloadEssentialSprites();
+      console.log('Sprites loaded successfully');
+    } catch (error) {
+      console.warn('Sprite loading failed, using fallback graphics:', error);
+    }
+
     // Hide loading screen
     const loading = document.getElementById('loading');
     if (loading) {
@@ -577,6 +600,9 @@ class PowerUpGame {
     // Handle tutorial interactions
     this.handleTutorialInput();
     
+    // Handle game over input
+    this.handleGameOverInput();
+    
     // Handle console purchase interactions
     this.handlePurchaseInput();
     
@@ -643,6 +669,9 @@ class PowerUpGame {
     
     // Update wall system
     this.wallSystem.update(deltaTime);
+    
+    // Update touch control system
+    this.touchControlSystem.update(deltaTime);
     
     // Update pathfinding obstacles (every few frames to avoid performance issues)
     if (this.frameCount % 10 === 0) { // Update every 10 frames
@@ -727,7 +756,72 @@ class PowerUpGame {
       
       // Handle wall system keyboard shortcuts
       this.wallSystem.handleKeyPress(key);
+      
+      // Handle statistics system shortcuts
+      if (key === 'KeyS') {
+        this.statisticsSystem.toggle();
+      } else {
+        this.statisticsSystem.handleKeyInput(key);
+      }
+      
+      // Handle touch control toggle (for testing on desktop)
+      if (key === 'KeyT') {
+        this.touchControlSystem.toggle();
+        console.log('Touch controls:', this.touchControlSystem.getStatus());
+      }
     });
+  }
+
+  /**
+   * Handle game over input
+   * @private
+   */
+  handleGameOverInput() {
+    // Only handle input when game is over
+    if (this.gameStateManager.getState() !== 'gameOver') return;
+    
+    // Restart game with R key
+    if (this.inputSystem.isKeyJustPressed('KeyR')) {
+      this.restartGame();
+    }
+    
+    // Return to menu with ESC key
+    if (this.inputSystem.isKeyJustPressed('Escape')) {
+      this.returnToMenu();
+    }
+  }
+
+  /**
+   * Restart the game from the beginning
+   * @private
+   */
+  restartGame() {
+    // Clear all entities
+    this.entities = [];
+    this.consoles = [];
+    this.guests = [];
+    this.powerUps = [];
+    this.floatingNumbers = [];
+    this.particleSystem = new ParticleSystem();
+    
+    // Reset character
+    this.character = null;
+    
+    // Start new game through game state manager
+    this.gameStateManager.startNewGame();
+    
+    // Reinitialize character and starting console
+    this.initializeGame();
+  }
+
+  /**
+   * Return to main menu (placeholder for now)
+   * @private
+   */
+  returnToMenu() {
+    // For now, just restart the game
+    // In the future, this could transition to a proper menu state
+    this.restartGame();
   }
 
   /**
@@ -788,25 +882,26 @@ class PowerUpGame {
       });
     }
     
-    // Add consoles as obstacles
+    // Add consoles as obstacles with larger buffer zones for tower defense feel
     this.consoles.forEach(console => {
       const transform = console.getComponent('Transform');
       obstacles.push({
-        x: transform.x - 30, // Console collision area
-        y: transform.y - 20,
-        width: 60,
-        height: 40
+        x: transform.x - 40, // Larger console collision area
+        y: transform.y - 30,
+        width: 80,
+        height: 60
       });
     });
     
-    // Add other guests as temporary obstacles (to avoid clustering)
+    // Add other guests as temporary obstacles (to prevent walking through each other)
     this.guests.forEach(guest => {
       const transform = guest.getComponent('Transform');
+      // Larger obstacle radius to prevent guests overlapping
       obstacles.push({
-        x: transform.x - 15,
-        y: transform.y - 15,
-        width: 30,
-        height: 30
+        x: transform.x - 20,
+        y: transform.y - 20,
+        width: 40,
+        height: 40
       });
     });
     
@@ -829,10 +924,13 @@ class PowerUpGame {
   }
 
   /**
-   * Update guest AI behavior
+   * Update guest AI behavior and collision avoidance
    * @private
    */
   updateGuestAI() {
+    // Update nearby guests for collision avoidance
+    this.updateGuestCollisionAvoidance();
+    
     this.guests.forEach(guest => {
       if (guest.state === 'seeking') {
         // Check if there are any immediately available consoles
@@ -848,6 +946,7 @@ class PowerUpGame {
               guest.startUsingConsole(availableConsole);
               console.debug(`Guest started using ${availableConsole.type} console directly`);
             } catch (error) {
+              // Console became occupied, try moving to it anyway (might queue)
               guest.moveToConsole(availableConsole);
             }
           } else {
@@ -860,6 +959,32 @@ class PowerUpGame {
   }
 
   /**
+   * Update collision avoidance by setting nearby guests for each guest
+   * @private
+   */
+  updateGuestCollisionAvoidance() {
+    const detectionRadius = 50; // Distance to consider other guests as "nearby"
+    
+    this.guests.forEach(guest => {
+      const guestTransform = guest.getComponent('Transform');
+      const nearbyGuests = [];
+      
+      this.guests.forEach(otherGuest => {
+        if (otherGuest === guest) return;
+        
+        const otherTransform = otherGuest.getComponent('Transform');
+        const distance = guestTransform.distanceTo(otherTransform);
+        
+        if (distance < detectionRadius) {
+          nearbyGuests.push(otherGuest);
+        }
+      });
+      
+      guest.setNearbyGuests(nearbyGuests);
+    });
+  }
+
+  /**
    * Find an immediately available console for a guest (no queue needed)
    * @param {Guest} guest - Guest looking for console
    * @returns {GameConsole|null} Available console or null
@@ -867,8 +992,7 @@ class PowerUpGame {
    */
   findImmediatelyAvailableConsole(guest) {
     const availableConsoles = this.consoles.filter(console => 
-      console.isOperational() && 
-      !console.isInUse() && 
+      console.canAcceptUser() && 
       console.getQueueLength() === 0
     );
     
@@ -891,13 +1015,20 @@ class PowerUpGame {
           this.gameStateManager.addMoney(payment);
           this.gameStateManager.serveGuest();
           
-          // Create floating money number
+          // Create floating money number and coin particles
           const guestTransform = guest.getComponent('Transform');
           this.createFloatingNumber(
             guestTransform.x, 
             guestTransform.y - 20, 
             `+£${payment}`, 
             '#00FF00'
+          );
+          
+          // Create coin particle burst for money collection
+          this.particleSystem.createCoinBurst(
+            guestTransform.x,
+            guestTransform.y - 10,
+            payment
           );
           
           guest.hasPaid = true;
@@ -961,6 +1092,12 @@ class PowerUpGame {
           1500
         );
         
+        // Add spark particle burst for breakdown effect
+        this.particleSystem.createSparkBurst(
+          randomConsole.getComponent('Transform').x,
+          randomConsole.getComponent('Transform').y
+        );
+        
         // Add screen shake for dramatic effect
         this.cameraSystem.addShake(15, 0.9);
       }
@@ -980,6 +1117,12 @@ class PowerUpGame {
           'BROKEN!',
           '#FF0000',
           1500
+        );
+        
+        // Add spark particle burst for breakdown effect
+        this.particleSystem.createSparkBurst(
+          randomConsole.getComponent('Transform').x,
+          randomConsole.getComponent('Transform').y
         );
         
         // Add screen shake for dramatic effect
@@ -1006,6 +1149,9 @@ class PowerUpGame {
       }
       return true;
     });
+    
+    // Update particle system
+    this.particleSystem.update(deltaTime);
   }
 
   /**
@@ -1094,6 +1240,12 @@ class PowerUpGame {
       // Clear canvas
       this.renderSystem.clear();
       
+      // Check if game is over and render game over screen instead
+      if (this.gameStateManager.getState() === 'gameOver') {
+        this.renderGameOverScreen();
+        return;
+      }
+      
       // Apply camera transform
       const cameraTransform = this.cameraSystem.getTransform();
       this.renderSystem.setTransform(cameraTransform);
@@ -1149,7 +1301,14 @@ class PowerUpGame {
         }
       });
       
-      // Layer 4: Floating numbers (top layer)
+      // Layer 4: Particles (behind floating numbers)
+      try {
+        this.particleSystem.render(this.renderSystem);
+      } catch (error) {
+        console.error('Error rendering particles:', error);
+      }
+      
+      // Layer 5: Floating numbers (top layer)
       this.floatingNumbers.forEach(floatingNumber => {
         try {
           floatingNumber.render(this.renderSystem);
@@ -1180,12 +1339,18 @@ class PowerUpGame {
     
     // Render console unlock notifications
     this.consoleUnlockSystem.render(this.renderSystem);
+    
+    // Render statistics dashboard (if visible)
+    this.statisticsSystem.render(this.renderSystem);
 
     // Reset transform for UI elements (UI should not be affected by camera)
     this.renderSystem.resetTransform();
     
     // Draw UI
     this.renderUI();
+    
+    // Render touch controls (always on top)
+    this.touchControlSystem.render(this.renderSystem);
   }
 
   /**
@@ -1311,8 +1476,8 @@ class PowerUpGame {
     
     // Control instructions
     const uiLines = [
-      'WASD: Move | SPACE: Repair | 1-4: Buy Consoles | U: Upgrades | A: Achievements',
-      'ENTER: Confirm Purchase | ESC: Cancel | P: Spawn Power-up (test) | B: Break Console (test)',
+      'WASD: Move | SPACE: Repair | 1-4: Buy Consoles | U: Upgrades | A: Achievements | T: Touch Controls',
+      'ENTER: Confirm Purchase | ESC: Cancel | S: Statistics | P: Spawn Power-up (test) | B: Break Console (test)',
       'Y: Unlock All Consoles (test) | O: Unlock Next Console (test) | D: Show Difficulty (test) | N: Next Day Difficulty (test) | W: Wall Info (test) | V: Toggle Walls'
     ];
     
@@ -1354,6 +1519,135 @@ class PowerUpGame {
       255, barY + 14,
       { font: '12px Arial', color: '#FFFFFF' }
     );
+  }
+
+  /**
+   * Render the Game Over screen with reason and statistics
+   * @private
+   */
+  renderGameOverScreen() {
+    // Reset transform for overlay rendering
+    this.renderSystem.resetTransform();
+    
+    // Draw semi-transparent overlay
+    this.renderSystem.drawRect(
+      0, 0, 
+      this.canvas.width, this.canvas.height, 
+      'rgba(0, 0, 0, 0.8)'
+    );
+    
+    const centerX = this.canvas.width / 2;
+    const centerY = this.canvas.height / 2;
+    
+    // Game Over title
+    this.renderSystem.drawText(
+      'GAME OVER',
+      centerX,
+      centerY - 120,
+      {
+        font: 'bold 48px Arial',
+        color: '#FF4444',
+        align: 'center',
+        stroke: true,
+        strokeColor: '#000000',
+        strokeWidth: 3
+      }
+    );
+    
+    // Game over reason
+    const reason = this.gameStateManager.gameOverReason || 'Unknown reason';
+    this.renderSystem.drawText(
+      reason,
+      centerX,
+      centerY - 60,
+      {
+        font: '24px Arial',
+        color: '#FFFFFF',
+        align: 'center',
+        stroke: true,
+        strokeColor: '#000000',
+        strokeWidth: 2
+      }
+    );
+    
+    // Final statistics
+    const stats = this.gameStateManager.getGameStats();
+    
+    const statsLines = [
+      `Day Reached: ${stats.day}`,
+      `Final Score: ${stats.currentScore.toLocaleString()}`,
+      `Total Revenue: £${stats.totalRevenue.toLocaleString()}`,
+      `Guests Served: ${stats.totalGuests}`,
+      `Perfect Days: ${stats.perfectDays}`,
+      `Time Played: ${this.formatPlayTime(stats.timePlayedMs)}`
+    ];
+    
+    // High score indicator
+    if (stats.currentScore === stats.highScore && stats.currentScore > 0) {
+      this.renderSystem.drawText(
+        '🏆 NEW HIGH SCORE! 🏆',
+        centerX,
+        centerY - 20,
+        {
+          font: 'bold 20px Arial',
+          color: '#FFD700',
+          align: 'center',
+          stroke: true,
+          strokeColor: '#000000',
+          strokeWidth: 2
+        }
+      );
+    }
+    
+    // Draw statistics
+    statsLines.forEach((line, index) => {
+      this.renderSystem.drawText(
+        line,
+        centerX,
+        centerY + 20 + (index * 25),
+        {
+          font: '18px Arial',
+          color: '#CCCCCC',
+          align: 'center',
+          stroke: true,
+          strokeColor: '#000000',
+          strokeWidth: 1
+        }
+      );
+    });
+    
+    // Instructions
+    this.renderSystem.drawText(
+      'Press R to restart or ESC to return to menu',
+      centerX,
+      centerY + 180,
+      {
+        font: '16px Arial',
+        color: '#AAAAAA',
+        align: 'center',
+        stroke: true,
+        strokeColor: '#000000',
+        strokeWidth: 1
+      }
+    );
+  }
+
+  /**
+   * Format play time from milliseconds to readable string
+   * @param {number} ms - Time in milliseconds
+   * @returns {string} Formatted time string
+   * @private
+   */
+  formatPlayTime(ms) {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    
+    if (minutes > 0) {
+      return `${minutes}m ${seconds}s`;
+    } else {
+      return `${seconds}s`;
+    }
   }
 
   /**

@@ -786,4 +786,52 @@ export class AchievementSystem {
       });
     }
   }
+
+  /**
+   * Get number of unlocked achievements
+   * @returns {number} Number of unlocked achievements
+   */
+  getUnlockedCount() {
+    return Object.values(this.achievements).filter(achievement => achievement.unlocked).length;
+  }
+
+  /**
+   * Get total number of achievements
+   * @returns {number} Total number of achievements
+   */
+  getTotalCount() {
+    return Object.keys(this.achievements).length;
+  }
+
+  /**
+   * Get completion percentage
+   * @returns {number} Completion percentage (0-100)
+   */
+  getCompletionPercentage() {
+    const unlocked = this.getUnlockedCount();
+    const total = this.getTotalCount();
+    return total > 0 ? (unlocked / total) * 100 : 0;
+  }
+
+  /**
+   * Get most recently unlocked achievement
+   * @returns {Object|null} Most recent achievement or null
+   */
+  getMostRecentAchievement() {
+    const unlockedAchievements = Object.values(this.achievements)
+      .filter(achievement => achievement.unlocked)
+      .sort((a, b) => (b.unlockedAt || 0) - (a.unlockedAt || 0));
+    
+    return unlockedAchievements.length > 0 ? unlockedAchievements[0] : null;
+  }
+
+  /**
+   * Get total achievement points earned
+   * @returns {number} Total points
+   */
+  getTotalPoints() {
+    return Object.values(this.achievements)
+      .filter(achievement => achievement.unlocked)
+      .reduce((total, achievement) => total + (achievement.points || 10), 0);
+  }
 }

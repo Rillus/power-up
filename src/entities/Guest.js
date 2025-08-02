@@ -76,6 +76,7 @@ export class Guest extends Entity {
     
     // Guest properties
     this.type = type;
+    this.radius = 8; // Guest radius for collision and fallback rendering
     
     // Get base stats from configuration
     const config = GUEST_TYPES[type];
@@ -149,11 +150,16 @@ export class Guest extends Entity {
   /**
    * Start using a console
    * @param {Object} console - Console object to use
-   * @throws {Error} When guest is not seeking
+   * @throws {Error} When guest is not seeking or console is occupied
    */
   startUsingConsole(console) {
     if (this.state !== 'seeking') {
       throw new Error('Guest is not seeking a console');
+    }
+    
+    // Try to add this guest as a user of the console
+    if (!console.addUser(this)) {
+      throw new Error('Console is already occupied or not operational');
     }
     
     this.state = 'using';
@@ -182,6 +188,7 @@ export class Guest extends Entity {
         // Finish using console
         if (this.currentConsole) {
           this.lastConsoleType = this.currentConsole.type;
+          this.currentConsole.removeUser(this); // Remove guest from console
           this.currentConsole.finishUse();
         }
         
@@ -198,7 +205,7 @@ export class Guest extends Entity {
 
 
   /**
-   * Update movement towards target
+   * Update movement towards target with collision avoidance
    * @param {number} deltaTime - Time elapsed in milliseconds
    */
   updateMovement(deltaTime) {
@@ -206,19 +213,76 @@ export class Guest extends Entity {
     this.updatePathfinding();
     
     const transform = this.getComponent('Transform');
-    const dx = this.targetX - transform.x;
-    const dy = this.targetY - transform.y;
+    let dx = this.targetX - transform.x;
+    let dy = this.targetY - transform.y;
     const distance = Math.sqrt(dx * dx + dy * dy);
     
     if (distance > 5) { // Moving threshold
-      const moveDistance = this.speed * (deltaTime / 1000);
-      const moveRatio = Math.min(moveDistance / distance, 1);
+      // Normalize direction
+      let directionX = dx / distance;
+      let directionY = dy / distance;
       
-      const newX = transform.x + dx * moveRatio;
-      const newY = transform.y + dy * moveRatio;
+      // Apply collision avoidance with nearby guests
+      if (this.nearbyGuests && this.nearbyGuests.length > 0) {
+        const avoidanceForce = this.calculateAvoidanceForce();
+        directionX += avoidanceForce.x * 0.4; // Weight avoidance at 40% of movement
+        directionY += avoidanceForce.y * 0.4;
+        
+        // Normalize direction after adding avoidance
+        const normalizedLength = Math.sqrt(directionX * directionX + directionY * directionY);
+        if (normalizedLength > 0) {
+          directionX /= normalizedLength;
+          directionY /= normalizedLength;
+        }
+      }
+      
+      const moveDistance = this.speed * (deltaTime / 1000);
+      const newX = transform.x + directionX * moveDistance;
+      const newY = transform.y + directionY * moveDistance;
       
       transform.setPosition(newX, newY);
     }
+  }
+
+  /**
+   * Calculate avoidance force to prevent overlapping with nearby guests
+   * @returns {Object} Avoidance force vector {x, y}
+   */
+  calculateAvoidanceForce() {
+    if (!this.nearbyGuests || this.nearbyGuests.length === 0) {
+      return { x: 0, y: 0 };
+    }
+
+    const transform = this.getComponent('Transform');
+    let avoidX = 0;
+    let avoidY = 0;
+    const avoidanceRadius = 30; // Minimum distance to maintain from other guests
+
+    this.nearbyGuests.forEach(otherGuest => {
+      if (otherGuest === this || otherGuest.state === 'using') return; // Don't avoid guests using consoles
+
+      const otherTransform = otherGuest.getComponent('Transform');
+      const dx = transform.x - otherTransform.x;
+      const dy = transform.y - otherTransform.y;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (distance < avoidanceRadius && distance > 0) {
+        // Calculate repulsion force (stronger when closer)
+        const force = (avoidanceRadius - distance) / avoidanceRadius;
+        avoidX += (dx / distance) * force;
+        avoidY += (dy / distance) * force;
+      }
+    });
+
+    return { x: avoidX, y: avoidY };
+  }
+
+  /**
+   * Set nearby guests for collision avoidance
+   * @param {Array} guests - Array of nearby guest entities
+   */
+  setNearbyGuests(guests) {
+    this.nearbyGuests = guests;
   }
 
   /**
@@ -671,54 +735,90 @@ export class Guest extends Entity {
     const transform = this.getComponent('Transform');
     if (!transform) return;
     
-    // Get guest appearance based on type and state
-    const colors = this.getGuestColors();
+    // Try sprite rendering first, then fallback to vector graphics
+    let usedSprite = false;
+    if (renderer.drawGuest) {
+      usedSprite = renderer.drawGuest(this);
+    }
     
-    // Draw guest body (rectangle)
-    renderer.drawRect(
-      transform.x - 8,
-      transform.y - 12,
-      16,
-      24,
-      colors.body
-    );
-    
-    // Draw guest head (circle) - this will be the background for the face
-    renderer.drawCircle(
-      transform.x,
-      transform.y - 16,
-      6,
-      colors.head
-    );
-    
-    // Draw emotion face icon ON the head (as the face)
-    const emotionIcon = this.getEmotionIcon();
-    const emotionColor = this.getEmotionColor();
-    
-    // Draw colored background circle for the emotion (slightly larger than head)
-    renderer.drawCircle(
-      transform.x,
-      transform.y - 16,
-      7,
-      emotionColor,
-      false,
-      0.4 // 40% opacity background
-    );
-    
-    // Draw the smiley face ON TOP of the head
-    renderer.drawText(
-      emotionIcon,
-      transform.x,
-      transform.y - 16,
-      {
-        font: '14px Arial',
-        color: '#000000', // Black face
-        align: 'center',
-        stroke: true,
-        strokeColor: '#FFFFFF',
-        strokeWidth: 1
-      }
-    );
+    // Always draw emotion overlay on top of sprite or fallback
+    if (usedSprite) {
+      // Draw emotion overlay on sprite
+      const emotionIcon = this.getEmotionIcon();
+      const emotionColor = this.getEmotionColor();
+      
+      // Draw colored background circle for the emotion
+      renderer.drawCircle(
+        transform.x,
+        transform.y - 10, // Adjust position for sprite
+        7,
+        emotionColor,
+        false
+      );
+      
+      // Draw the smiley face ON TOP
+      renderer.drawText(
+        emotionIcon,
+        transform.x,
+        transform.y - 10,
+        {
+          font: '14px Arial',
+          color: '#000000',
+          align: 'center',
+          stroke: true,
+          strokeColor: '#FFFFFF',
+          strokeWidth: 1
+        }
+      );
+    } else {
+      // Legacy vector rendering fallback
+      const colors = this.getGuestColors();
+      
+      // Draw guest body (rectangle)
+      renderer.drawRect(
+        transform.x - 8,
+        transform.y - 12,
+        16,
+        24,
+        colors.body
+      );
+      
+      // Draw guest head (circle) - this will be the background for the face
+      renderer.drawCircle(
+        transform.x,
+        transform.y - 16,
+        6,
+        colors.head
+      );
+      
+      // Draw emotion face icon ON the head (as the face)
+      const emotionIcon = this.getEmotionIcon();
+      const emotionColor = this.getEmotionColor();
+      
+      // Draw colored background circle for the emotion (slightly larger than head)
+      renderer.drawCircle(
+        transform.x,
+        transform.y - 16,
+        7,
+        emotionColor,
+        false
+      );
+      
+      // Draw the smiley face ON TOP of the head
+      renderer.drawText(
+        emotionIcon,
+        transform.x,
+        transform.y - 16,
+        {
+          font: '14px Arial',
+          color: '#000000', // Black face
+          align: 'center',
+          stroke: true,
+          strokeColor: '#FFFFFF',
+          strokeWidth: 1
+        }
+      );
+    }
     
     // Draw patience bar for seeking/waiting guests (not using/leaving)
     if (this.state === 'seeking' || this.state === 'waiting') {

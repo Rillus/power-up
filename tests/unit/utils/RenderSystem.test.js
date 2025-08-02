@@ -134,7 +134,7 @@ describe('RenderSystem', () => {
       
       renderSystem.drawSprite(mockImage, 100, 200);
       
-      expect(mockContext.drawImage).toHaveBeenCalledWith(mockImage, 100, 200);
+      expect(mockContext.drawImage).toHaveBeenCalledWith(mockImage, 100, 200, 64, 64);
     });
 
     it('should draw sprite with source rectangle', () => {

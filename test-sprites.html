@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Power Up - Sprite System Test</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            padding: 20px; 
+            background: #f5f5f5;
+        }
+        canvas { 
+            border: 2px solid #333; 
+            background: white;
+            display: block;
+            margin: 20px auto;
+        }
+        .status {
+            text-align: center;
+            margin: 10px;
+            padding: 10px;
+            background: white;
+            border-radius: 4px;
+        }
+        .loaded { color: green; }
+        .fallback { color: orange; }
+        .error { color: red; }
+    </style>
+</head>
+<body>
+    <h1>Power Up - Sprite System Test</h1>
+    <div id="status" class="status">Loading sprites...</div>
+    <canvas id="test-canvas" width="800" height="600"></canvas>
+    
+    <script type="module">
+        import { RenderSystem } from './src/engine/systems/RenderSystem.js';
+        import { spriteLoader } from './src/utils/SpriteLoader.js';
+        import { Character } from './src/entities/Character.js';
+        import { GameConsole } from './src/entities/GameConsole.js';
+        import { Guest } from './src/entities/Guest.js';
+
+        const canvas = document.getElementById('test-canvas');
+        const statusDiv = document.getElementById('status');
+        const renderSystem = new RenderSystem(canvas, spriteLoader);
+
+        // Create test entities
+        const character = new Character(400, 300, { name: 'Test Volunteer' });
+        const console1 = new GameConsole(300, 200, 'retro-arcade', 1);
+        const console2 = new GameConsole(450, 200, 'classic-home', 2);
+        const console3 = new GameConsole(600, 200, 'modern-gaming', 3);
+        const guest1 = new Guest(100, 500, 'casual');
+        const guest2 = new Guest(250, 500, 'enthusiast');
+        const guest3 = new Guest(400, 500, 'family');
+
+        // Test directional movement
+        let testDirection = 0;
+        const directions = [
+            { name: 'Down', x: 0, y: 1 },
+            { name: 'Right', x: 1, y: 0 },
+            { name: 'Up', x: 0, y: -1 },
+            { name: 'Left', x: -1, y: 0 },
+            { name: 'Idle', x: 0, y: 0 }
+        ];
+        
+        setInterval(() => {
+            const dir = directions[testDirection];
+            character.setMovementDirection(dir.x, dir.y);
+            testDirection = (testDirection + 1) % directions.length;
+        }, 2000); // Change direction every 2 seconds
+
+        async function testSprites() {
+            try {
+                statusDiv.textContent = 'Loading sprites...';
+                await spriteLoader.preloadEssentialSprites();
+                statusDiv.innerHTML = '<span class="loaded">✓ Sprites loaded successfully! Testing sprite rendering...</span>';
+                
+                // Test sprite loading
+                const spriteTests = [
+                    { type: 'character', id: 'volunteer_idle' },
+                    { type: 'consoles', id: 'retro_arcade_tier1' },
+                    { type: 'guests', id: 'casual_family_01' }
+                ];
+                
+                let loadedCount = 0;
+                for (const test of spriteTests) {
+                    if (spriteLoader.isLoaded(test.type, test.id)) {
+                        loadedCount++;
+                    }
+                }
+                
+                if (loadedCount === spriteTests.length) {
+                    statusDiv.innerHTML += '<br><span class="loaded">All test sprites loaded ✓</span>';
+                } else {
+                    statusDiv.innerHTML += '<br><span class="fallback">Some sprites missing, using fallback ⚠</span>';
+                }
+                
+            } catch (error) {
+                console.error('Sprite loading failed:', error);
+                statusDiv.innerHTML = '<span class="fallback">⚠ Sprite loading failed, using fallback graphics</span>';
+            }
+            
+            // Start rendering loop
+            render();
+        }
+
+        function render() {
+            // Clear canvas
+            renderSystem.clear();
+            
+            // Draw test entities
+            character.render(renderSystem);
+            console1.render(renderSystem);
+            console2.render(renderSystem);
+            console3.render(renderSystem);
+            guest1.render(renderSystem);
+            guest2.render(renderSystem);
+            guest3.render(renderSystem);
+            
+            // Draw labels
+            const currentDir = directions[testDirection === 0 ? directions.length - 1 : testDirection - 1];
+            renderSystem.drawText(`Character (Facing: ${currentDir.name})`, 400, 350, { align: 'center', font: '12px Arial' });
+            renderSystem.drawText('Retro T1', 300, 250, { align: 'center', font: '10px Arial' });
+            renderSystem.drawText('Classic T2', 450, 250, { align: 'center', font: '10px Arial' });
+            renderSystem.drawText('Modern T3', 600, 250, { align: 'center', font: '10px Arial' });
+            renderSystem.drawText('Casual', 100, 530, { align: 'center', font: '10px Arial' });
+            renderSystem.drawText('Enthusiast', 250, 530, { align: 'center', font: '10px Arial' });
+            renderSystem.drawText('Family', 400, 530, { align: 'center', font: '10px Arial' });
+            
+            // Show sprite loading status
+            const progress = spriteLoader.getLoadingProgress();
+            renderSystem.drawText(
+                `Sprite Progress: ${Math.round(progress * 100)}%`, 
+                400, 50, 
+                { align: 'center', font: '16px Arial', color: progress === 1 ? '#00AA00' : '#0066CC' }
+            );
+            
+            requestAnimationFrame(render);
+        }
+
+        // Start the test
+        testSprites();
+    </script>
+</body>
+</html>

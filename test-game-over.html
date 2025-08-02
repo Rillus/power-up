@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Power Up Game - Game Over Test</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 20px;
+            font-family: Arial, sans-serif;
+            background: #333;
+            color: white;
+        }
+        canvas {
+            border: 2px solid #555;
+            background: #111;
+        }
+        .controls {
+            margin-top: 20px;
+        }
+        button {
+            padding: 10px 20px;
+            margin: 5px;
+            background: #555;
+            color: white;
+            border: none;
+            cursor: pointer;
+        }
+        button:hover {
+            background: #777;
+        }
+    </style>
+</head>
+<body>
+    <h1>Power Up Game - Game Over Screen Test</h1>
+    <div>
+        <span>Money: </span><span id="money-counter">£2000</span> | 
+        <span>Day: </span><span id="day-counter">Day 1</span> | 
+        <span>Angry Guests: </span><span id="angry-counter">0/3</span>
+    </div>
+    <canvas id="game-canvas" width="1200" height="800"></canvas>
+    
+    <div class="controls">
+        <h3>Test Controls:</h3>
+        <button onclick="triggerGameOver()">Trigger Game Over (3 Angry Guests)</button>
+        <button onclick="restartGame()">Restart Game (R key)</button>
+        <button onclick="returnToMenu()">Return to Menu (ESC key)</button>
+        <p><strong>Instructions:</strong></p>
+        <ul>
+            <li>Click "Trigger Game Over" to see the game over screen</li>
+            <li>Press R to restart or ESC to return to menu when game over</li>
+            <li>The screen should clearly show the reason for game over and final statistics</li>
+        </ul>
+    </div>
+
+    <script type="module">
+        import { PowerUpGame } from './src/main.js';
+        
+        // Create game instance
+        window.game = new PowerUpGame();
+        window.game.initializeGame();
+        window.game.start();
+        
+        // Test functions
+        window.triggerGameOver = function() {
+            // Force game over condition
+            window.game.gameStateManager.gameData.angryGuests = 3;
+            window.game.gameStateManager.gameOver('Too many angry guests (3/3) - Exhibition reputation damaged beyond repair!');
+            console.log('Game over triggered. Current state:', window.game.gameStateManager.getState());
+        };
+        
+        window.restartGame = function() {
+            // Simulate R key press
+            window.game.inputSystem.simulateKeyPress('KeyR');
+            console.log('Restart triggered');
+        };
+        
+        window.returnToMenu = function() {
+            // Simulate ESC key press
+            window.game.inputSystem.simulateKeyPress('Escape');
+            console.log('Return to menu triggered');
+        };
+        
+        console.log('Game loaded. Use the buttons to test the game over screen.');
+    </script>
+</body>
+</html>

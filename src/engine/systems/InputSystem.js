@@ -227,6 +227,28 @@ export class InputSystem {
   }
 
   /**
+   * Simulate a key press (for touch controls)
+   * @param {string} keyCode - The key code to simulate (e.g., 'KeyW', 'KeyA')
+   */
+  simulateKeyPress(keyCode) {
+    if (!this.keys[keyCode]) {
+      this.keys[keyCode] = true;
+      this.justPressed[keyCode] = true;
+    }
+  }
+
+  /**
+   * Simulate a key release (for touch controls)
+   * @param {string} keyCode - The key code to simulate (e.g., 'KeyW', 'KeyA')
+   */
+  simulateKeyRelease(keyCode) {
+    if (this.keys[keyCode]) {
+      this.keys[keyCode] = false;
+      this.justReleased[keyCode] = true;
+    }
+  }
+
+  /**
    * Clean up event listeners
    */
   destroy() {

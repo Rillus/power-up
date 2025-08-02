@@ -39,6 +39,9 @@ export class Character extends Entity {
     // Debug mode for showing additional info
     this.debugMode = false;
     
+    // Last facing direction for sprite animation
+    this.lastDirection = 'down';
+    
     // Collision boundaries (will be updated by game when wall system is available)
     this.boundaries = {
       left: 20,
@@ -70,6 +73,7 @@ export class Character extends Entity {
   moveUp() {
     const movement = this.getComponent('Movement');
     movement.setDirection(0, -1);
+    this.lastDirection = 'up';
   }
 
   /**
@@ -78,6 +82,7 @@ export class Character extends Entity {
   moveDown() {
     const movement = this.getComponent('Movement');
     movement.setDirection(0, 1);
+    this.lastDirection = 'down';
   }
 
   /**
@@ -86,6 +91,7 @@ export class Character extends Entity {
   moveLeft() {
     const movement = this.getComponent('Movement');
     movement.setDirection(-1, 0);
+    this.lastDirection = 'left';
   }
 
   /**
@@ -94,6 +100,7 @@ export class Character extends Entity {
   moveRight() {
     const movement = this.getComponent('Movement');
     movement.setDirection(1, 0);
+    this.lastDirection = 'right';
   }
 
   /**
@@ -112,6 +119,15 @@ export class Character extends Entity {
   setMovementDirection(x, y) {
     const movement = this.getComponent('Movement');
     movement.setDirection(x, y);
+    
+    // Update last direction based on movement vector
+    if (x !== 0 || y !== 0) {
+      if (Math.abs(y) > Math.abs(x)) {
+        this.lastDirection = y > 0 ? 'down' : 'up';
+      } else {
+        this.lastDirection = x > 0 ? 'right' : 'left';
+      }
+    }
   }
 
   // Position Methods
@@ -298,8 +314,7 @@ export class Character extends Entity {
         transform.y,
         this.radius + 8,
         '#00FF00',
-        false,
-        0.3 // 30% opacity
+        false
       );
       
       // Animated speed lines
@@ -322,8 +337,7 @@ export class Character extends Entity {
         transform.y,
         this.radius + 6,
         '#FFD700',
-        false,
-        0.4 // 40% opacity
+        false
       );
       
       // Tool icons around character
@@ -347,31 +361,36 @@ export class Character extends Entity {
       }
     }
     
-    // Draw character as circle
-    let characterColor = this.color;
-    if (this.hasSpeedBoost) {
-      characterColor = '#66FF66'; // Tinted green during speed boost
-    } else if (this.hasRepairBoost) {
-      characterColor = '#FFFF66'; // Tinted yellow during repair boost
+    // Draw the character (sprite or fallback)
+    if (renderer.drawCharacter) {
+      renderer.drawCharacter(this);
+    } else {
+      // Legacy fallback if renderer doesn't have sprite support
+      let characterColor = this.color;
+      if (this.hasSpeedBoost) {
+        characterColor = '#66FF66'; // Tinted green during speed boost
+      } else if (this.hasRepairBoost) {
+        characterColor = '#FFFF66'; // Tinted yellow during repair boost
+      }
+      
+      renderer.drawCircle(
+        transform.x,
+        transform.y,
+        this.radius,
+        characterColor
+      );
     }
-    
-    renderer.drawCircle(
-      transform.x,
-      transform.y,
-      this.radius,
-      characterColor
-    );
     
     // Draw character name in debug mode
     if (this.debugMode) {
       renderer.drawText(
         this.name,
         transform.x,
-        transform.y - 15, // Above character
+        transform.y - 30, // Above character (adjusted for sprite height)
         {
           color: '#FFFFFF',
-          fontSize: 12,
-          textAlign: 'center'
+          font: '12px Arial',
+          align: 'center'
         }
       );
     }

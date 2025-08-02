@@ -88,7 +88,10 @@ describe('Guest', () => {
         isOperational: () => true,
         use: () => {},
         finishUse: () => {},
-        calculateRevenue: (guest) => 2
+        calculateRevenue: (guest) => 2,
+        addUser: () => true,
+        removeUser: () => {},
+        canAcceptUser: () => true
       };
     });
 
@@ -218,7 +221,10 @@ describe('Guest', () => {
         isOperational: () => true,
         use: () => {},
         finishUse: () => {},
-        calculateRevenue: () => 2
+        calculateRevenue: () => 2,
+        addUser: () => true,
+        removeUser: () => {},
+        canAcceptUser: () => true
       };
       
       guest.startUsingConsole(mockConsole);

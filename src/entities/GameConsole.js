@@ -110,6 +110,8 @@ export class GameConsole extends Entity {
     // Console properties
     this.type = type;
     this.tier = tier;
+    this.width = 60;  // Console width for rendering
+    this.height = 40; // Console height for rendering
     
     // Get base stats from configuration
     const config = CONSOLE_TYPES[type];
@@ -166,6 +168,57 @@ export class GameConsole extends Entity {
     if (this.state === 'in-use' && this.durability > 0) {
       this.state = 'operational';
     }
+  }
+
+  /**
+   * Add a guest as current user (enforces single user limit)
+   * @param {Guest} guest - Guest to add as user
+   * @returns {boolean} True if successfully added, false if console is occupied
+   */
+  addUser(guest) {
+    if (this.currentUsers.length >= 1) {
+      return false; // Console is already occupied by one guest
+    }
+    
+    if (!this.isOperational()) {
+      return false; // Console is not operational
+    }
+    
+    this.currentUsers.push(guest);
+    this.state = 'in-use';
+    return true;
+  }
+
+  /**
+   * Remove a guest from current users
+   * @param {Guest} guest - Guest to remove
+   */
+  removeUser(guest) {
+    const index = this.currentUsers.indexOf(guest);
+    if (index !== -1) {
+      this.currentUsers.splice(index, 1);
+      
+      // If no more users, return to operational state
+      if (this.currentUsers.length === 0 && this.durability > 0) {
+        this.state = 'operational';
+      }
+    }
+  }
+
+  /**
+   * Check if console can accept a new user
+   * @returns {boolean} True if console can accept a guest
+   */
+  canAcceptUser() {
+    return this.isOperational() && this.currentUsers.length === 0;
+  }
+
+  /**
+   * Get current user (since we only allow one)
+   * @returns {Guest|null} Current user or null
+   */
+  getCurrentUser() {
+    return this.currentUsers.length > 0 ? this.currentUsers[0] : null;
   }
 
   /**
@@ -440,43 +493,48 @@ export class GameConsole extends Entity {
     const transform = this.getComponent('Transform');
     if (!transform) return;
     
-    // Get colors
-    const statusColor = this.getStatusColor();
-    const typeColor = this.getTypeColor();
-    const tierBorderColor = this.getTierBorderColor();
+    // Try sprite rendering first, then fallback to vector graphics
+    let usedSprite = false;
+    if (renderer.drawConsole) {
+      usedSprite = renderer.drawConsole(this);
+    }
     
-    // Draw console base with type-specific color
-    renderer.drawRect(
-      transform.x - 30,
-      transform.y - 20,
-      60,
-      40,
-      typeColor
-    );
-    
-    // Draw status overlay with transparency
-    renderer.drawRect(
-      transform.x - 30,
-      transform.y - 20,
-      60,
-      40,
-      statusColor,
-      false,
-      0.3 // 30% opacity for status overlay
-    );
-    
-    // Draw tier-based border
-    const borderWidth = this.tier; // Thicker border for higher tiers
-    renderer.drawRect(
-      transform.x - 32,
-      transform.y - 22,
-      64,
-      44,
-      tierBorderColor,
-      true, // stroke only
-      1.0,
-      borderWidth
-    );
+    if (!usedSprite) {
+      // Legacy vector rendering fallback
+      const statusColor = this.getStatusColor();
+      const typeColor = this.getTypeColor();
+      const tierBorderColor = this.getTierBorderColor();
+      
+      // Draw console base with type-specific color
+      renderer.drawRect(
+        transform.x - 30,
+        transform.y - 20,
+        60,
+        40,
+        typeColor
+      );
+      
+      // Draw status overlay with transparency
+      renderer.drawRect(
+        transform.x - 30,
+        transform.y - 20,
+        60,
+        40,
+        statusColor,
+        false
+      );
+      
+      // Draw tier-based border
+      const borderWidth = this.tier; // Thicker border for higher tiers
+      renderer.drawRect(
+        transform.x - 32,
+        transform.y - 22,
+        64,
+        44,
+        tierBorderColor,
+        true // stroke only
+      );
+    }
     
     // Draw upgrade stars for tiers 2 and 3
     if (this.tier > 1) {
